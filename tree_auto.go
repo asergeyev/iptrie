@@ -74,20 +74,30 @@ func (node *btrienode32) bitsMatched(key []uint32, ln byte) byte {
 	return plen
 }
 
+func (t *tree32) isEmpty() bool {
+	return t.btrienode32 == nil
+}
+
 func (t *tree32) findBestMatch(key []uint32, ln byte, container **btrienode32) (bool, *btrienode32) {
 	var (
-		exact  bool
-		parent *btrienode32
-		pstack = make([]*btrienode32, 0, 32)
-		node   = t.btrienode32
+		exact   bool
+		cparent *btrienode32
+		parent  *btrienode32
+		node    = t.btrienode32
 	)
 	for node != nil && node.prefixlen <= ln && node.match(key, node.prefixlen) {
-		pstack = append(pstack, node)
-		parent = node
-		if DEBUG != nil {
-			fmt.Fprintf(DEBUG, "found %s for %s\n", keyStr(parent.bits[:], parent.prefixlen), keyStr(key, ln))
+		if parent != nil && parent.dummy == 0 {
+			cparent = parent
 		}
-		if parent.prefixlen == ln {
+		if DEBUG != nil {
+			if node.dummy != 0 {
+				fmt.Fprintf(DEBUG, "dummy %s for %s\n", keyStr(node.bits[:], node.prefixlen), keyStr(key, ln))
+			} else {
+				fmt.Fprintf(DEBUG, "found %s for %s\n", keyStr(node.bits[:], node.prefixlen), keyStr(key, ln))
+			}
+		}
+		parent = node
+		if node.prefixlen == ln {
 			exact = true
 			break
 		}
@@ -98,11 +108,7 @@ func (t *tree32) findBestMatch(key []uint32, ln byte, container **btrienode32) (
 		}
 	}
 	if container != nil {
-		for ln := len(pstack) - 1; ln >= 0; pstack, ln = pstack[:ln], ln-1 {
-			if pstack[ln].dummy != 1 {
-				*container = pstack[ln]
-			}
-		}
+		*container = cparent
 	}
 	return exact, parent
 }
@@ -339,20 +345,30 @@ func (node *btrienode64) bitsMatched(key []uint32, ln byte) byte {
 	return plen
 }
 
+func (t *tree64) isEmpty() bool {
+	return t.btrienode64 == nil
+}
+
 func (t *tree64) findBestMatch(key []uint32, ln byte, container **btrienode64) (bool, *btrienode64) {
 	var (
-		exact  bool
-		parent *btrienode64
-		pstack = make([]*btrienode64, 0, 64)
-		node   = t.btrienode64
+		exact   bool
+		cparent *btrienode64
+		parent  *btrienode64
+		node    = t.btrienode64
 	)
 	for node != nil && node.prefixlen <= ln && node.match(key, node.prefixlen) {
-		pstack = append(pstack, node)
-		parent = node
-		if DEBUG != nil {
-			fmt.Fprintf(DEBUG, "found %s for %s\n", keyStr(parent.bits[:], parent.prefixlen), keyStr(key, ln))
+		if parent != nil && parent.dummy == 0 {
+			cparent = parent
 		}
-		if parent.prefixlen == ln {
+		if DEBUG != nil {
+			if node.dummy != 0 {
+				fmt.Fprintf(DEBUG, "dummy %s for %s\n", keyStr(node.bits[:], node.prefixlen), keyStr(key, ln))
+			} else {
+				fmt.Fprintf(DEBUG, "found %s for %s\n", keyStr(node.bits[:], node.prefixlen), keyStr(key, ln))
+			}
+		}
+		parent = node
+		if node.prefixlen == ln {
 			exact = true
 			break
 		}
@@ -363,11 +379,7 @@ func (t *tree64) findBestMatch(key []uint32, ln byte, container **btrienode64) (
 		}
 	}
 	if container != nil {
-		for ln := len(pstack) - 1; ln >= 0; pstack, ln = pstack[:ln], ln-1 {
-			if pstack[ln].dummy != 1 {
-				*container = pstack[ln]
-			}
-		}
+		*container = cparent
 	}
 	return exact, parent
 }
@@ -604,20 +616,30 @@ func (node *btrienode128) bitsMatched(key []uint32, ln byte) byte {
 	return plen
 }
 
+func (t *tree128) isEmpty() bool {
+	return t.btrienode128 == nil
+}
+
 func (t *tree128) findBestMatch(key []uint32, ln byte, container **btrienode128) (bool, *btrienode128) {
 	var (
-		exact  bool
-		parent *btrienode128
-		pstack = make([]*btrienode128, 0, 128)
-		node   = t.btrienode128
+		exact   bool
+		cparent *btrienode128
+		parent  *btrienode128
+		node    = t.btrienode128
 	)
 	for node != nil && node.prefixlen <= ln && node.match(key, node.prefixlen) {
-		pstack = append(pstack, node)
-		parent = node
-		if DEBUG != nil {
-			fmt.Fprintf(DEBUG, "found %s for %s\n", keyStr(parent.bits[:], parent.prefixlen), keyStr(key, ln))
+		if parent != nil && parent.dummy == 0 {
+			cparent = parent
 		}
-		if parent.prefixlen == ln {
+		if DEBUG != nil {
+			if node.dummy != 0 {
+				fmt.Fprintf(DEBUG, "dummy %s for %s\n", keyStr(node.bits[:], node.prefixlen), keyStr(key, ln))
+			} else {
+				fmt.Fprintf(DEBUG, "found %s for %s\n", keyStr(node.bits[:], node.prefixlen), keyStr(key, ln))
+			}
+		}
+		parent = node
+		if node.prefixlen == ln {
 			exact = true
 			break
 		}
@@ -628,11 +650,7 @@ func (t *tree128) findBestMatch(key []uint32, ln byte, container **btrienode128)
 		}
 	}
 	if container != nil {
-		for ln := len(pstack) - 1; ln >= 0; pstack, ln = pstack[:ln], ln-1 {
-			if pstack[ln].dummy != 1 {
-				*container = pstack[ln]
-			}
-		}
+		*container = cparent
 	}
 	return exact, parent
 }

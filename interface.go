@@ -16,7 +16,7 @@ type RegularTrie struct {
 	t6 *tree128
 }
 
-// TODO: implement v6 calls
+// TODO: implement v6 calls... generate as with different trie code?
 
 func NewTrie() *RegularTrie {
 	return &RegularTrie{new(tree32), new(tree128)}
@@ -28,10 +28,27 @@ func (rt *RegularTrie) GetIp4(ip []byte, mask byte) (bool, []byte, byte, unsafe.
 	}
 	u32 := binary.BigEndian.Uint32(ip) &^ (0xffffffff >> mask)
 
-	exact, node := rt.t4.findBestMatch([]uint32{u32}, mask, nil)
+	var ct *btrienode32
+	exact, node := rt.t4.findBestMatch([]uint32{u32}, mask, &ct)
+
+	// when found non-dummy node:
+	if node.dummy == 0 {
+		v := make([]byte, 4)
+		binary.BigEndian.PutUint32(v, node.bits[0])
+		return exact, v, node.prefixlen, node.data
+	}
+
+	// if there was no proper container
+	if ct == nil {
+		return false, nil, 0, nil
+	}
+
+	// accept container ase right answer
 	v := make([]byte, 4)
-	binary.BigEndian.PutUint32(v, node.bits[0])
-	return exact, v, node.prefixlen, node.data
+	binary.BigEndian.PutUint32(v, ct.bits[0])
+
+	// our interpretation of exat match is different than internally:
+	return false, v, ct.prefixlen, ct.data
 }
 
 func (rt *RegularTrie) AppendIp4(ip []byte, mask byte, value unsafe.Pointer) (bool, unsafe.Pointer) {

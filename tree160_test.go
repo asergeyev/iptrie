@@ -56,6 +56,7 @@ func TestTreeAppend(t *testing.T) {
 		}
 		DEBUG = nil
 	}
+	var container *btrienode160
 	// should find exact and not-exact matches
 	for _, testcase := range testCases {
 		for _, s := range testcase {
@@ -63,7 +64,7 @@ func TestTreeAppend(t *testing.T) {
 			if !exact {
 				t.Errorf("Incorrect match found for exact search, got %v key while looking for %v", match, s.getKey())
 			}
-			exact, match = T.findBestMatch(s.getKey(), s.ln+1, nil)
+			exact, match = T.findBestMatch(s.getKey(), s.ln+1, &container)
 			if exact || match.prefixlen != s.ln {
 				t.Errorf("Incorrect match found for not-exact search, got %v key while looking for %v", match, s.getKey())
 			}
