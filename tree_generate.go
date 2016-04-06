@@ -82,6 +82,7 @@ func main() {
 				continue
 			}
 			definition = strings.Replace(definition, "160", maxbits, -1)
+			definition = strings.Replace(definition, "MAXBITS", maxbits, -1)
 			definition = strings.Replace(definition, "[5]uint32", "["+maxbits+"/32]uint32", -1)
 			fmt.Fprint(dst, definition)
 		}

@@ -14,7 +14,7 @@ type tree32 struct {
 type btrienode32 struct {
 	a, b      *btrienode32
 	data      unsafe.Pointer
-	bits      [MAXBITS / 32]uint32
+	bits      [32 / 32]uint32
 	prefixlen byte
 	dummy     byte
 }
@@ -78,7 +78,7 @@ func (t *tree32) findBestMatch(key []uint32, ln byte, container **btrienode32) (
 	var (
 		exact  bool
 		parent *btrienode32
-		pstack = make([]*btrienode32, 0, MAXBITS)
+		pstack = make([]*btrienode32, 0, 32)
 		node   = t.btrienode32
 	)
 	for node != nil && node.prefixlen <= ln && node.match(key, node.prefixlen) {
@@ -108,8 +108,8 @@ func (t *tree32) findBestMatch(key []uint32, ln byte, container **btrienode32) (
 }
 
 func (t *tree32) addRoute(key []uint32, ln byte, value unsafe.Pointer, replace bool) (set bool, oldval unsafe.Pointer) {
-	if ln > MAXBITS {
-		panic("Unable to add prefix longer than MAXBITS")
+	if ln > 32 {
+		panic("Unable to add prefix longer than 32")
 	}
 	set = true
 	if t.btrienode32 == nil {
@@ -279,7 +279,7 @@ type tree64 struct {
 type btrienode64 struct {
 	a, b      *btrienode64
 	data      unsafe.Pointer
-	bits      [MAXBITS / 32]uint32
+	bits      [64 / 32]uint32
 	prefixlen byte
 	dummy     byte
 }
@@ -343,7 +343,7 @@ func (t *tree64) findBestMatch(key []uint32, ln byte, container **btrienode64) (
 	var (
 		exact  bool
 		parent *btrienode64
-		pstack = make([]*btrienode64, 0, MAXBITS)
+		pstack = make([]*btrienode64, 0, 64)
 		node   = t.btrienode64
 	)
 	for node != nil && node.prefixlen <= ln && node.match(key, node.prefixlen) {
@@ -373,8 +373,8 @@ func (t *tree64) findBestMatch(key []uint32, ln byte, container **btrienode64) (
 }
 
 func (t *tree64) addRoute(key []uint32, ln byte, value unsafe.Pointer, replace bool) (set bool, oldval unsafe.Pointer) {
-	if ln > MAXBITS {
-		panic("Unable to add prefix longer than MAXBITS")
+	if ln > 64 {
+		panic("Unable to add prefix longer than 64")
 	}
 	set = true
 	if t.btrienode64 == nil {
@@ -544,7 +544,7 @@ type tree128 struct {
 type btrienode128 struct {
 	a, b      *btrienode128
 	data      unsafe.Pointer
-	bits      [MAXBITS / 32]uint32
+	bits      [128 / 32]uint32
 	prefixlen byte
 	dummy     byte
 }
@@ -608,7 +608,7 @@ func (t *tree128) findBestMatch(key []uint32, ln byte, container **btrienode128)
 	var (
 		exact  bool
 		parent *btrienode128
-		pstack = make([]*btrienode128, 0, MAXBITS)
+		pstack = make([]*btrienode128, 0, 128)
 		node   = t.btrienode128
 	)
 	for node != nil && node.prefixlen <= ln && node.match(key, node.prefixlen) {
@@ -638,8 +638,8 @@ func (t *tree128) findBestMatch(key []uint32, ln byte, container **btrienode128)
 }
 
 func (t *tree128) addRoute(key []uint32, ln byte, value unsafe.Pointer, replace bool) (set bool, oldval unsafe.Pointer) {
-	if ln > MAXBITS {
-		panic("Unable to add prefix longer than MAXBITS")
+	if ln > 128 {
+		panic("Unable to add prefix longer than 128")
 	}
 	set = true
 	if t.btrienode128 == nil {
