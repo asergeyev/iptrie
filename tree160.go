@@ -27,10 +27,6 @@ func keyStr(s []uint32, ln byte) string {
 
 //go:generate go run ./tree_generate.go -o tree_auto.go
 
-type tree160 struct {
-	*btrienode160
-}
-
 type btrienode160 struct {
 	a, b      *btrienode160
 	data      unsafe.Pointer
@@ -94,11 +90,30 @@ func (node *btrienode160) bitsMatched(key []uint32, ln byte) byte {
 	return plen
 }
 
+type tree160 struct {
+	*btrienode160
+	nodes []btrienode160
+}
+
+func (t *tree160) newnode(bits []uint32, prefixlen, dummy byte) *btrienode160 {
+	if len(t.nodes) == 0 {
+		t.nodes = make([]btrienode160, 20) // 20 nodes at once to prepare
+	}
+
+	idx := len(t.nodes) - 1
+	node := &(t.nodes[idx])
+	t.nodes = t.nodes[:idx]
+
+	node.prefixlen, node.dummy = prefixlen, dummy
+	copy(node.bits[:], bits)
+	return node
+}
+
 func (t *tree160) isEmpty() bool {
 	return t.btrienode160 == nil
 }
 
-func (t *tree160) findBestMatch(key []uint32, ln byte, container **btrienode160) (bool, *btrienode160) {
+func (t *tree160) findBestMatch(key []uint32, ln byte) (bool, *btrienode160, *btrienode160) {
 	var (
 		exact   bool
 		cparent *btrienode160
@@ -127,10 +142,7 @@ func (t *tree160) findBestMatch(key []uint32, ln byte, container **btrienode160)
 			node = node.b
 		}
 	}
-	if container != nil {
-		*container = cparent
-	}
-	return exact, parent
+	return exact, parent, cparent
 }
 
 func (t *tree160) addRoute(key []uint32, ln byte, value unsafe.Pointer, replace bool) (set bool, oldval unsafe.Pointer) {
@@ -143,8 +155,7 @@ func (t *tree160) addRoute(key []uint32, ln byte, value unsafe.Pointer, replace 
 		if DEBUG != nil {
 			fmt.Fprintf(DEBUG, "root=%s (no subtree)\n", keyStr(key, ln))
 		}
-		t.btrienode160 = &btrienode160{data: value, prefixlen: ln}
-		copy(t.btrienode160.bits[:], key[:(ln+31)/32])
+		t.btrienode160 = t.newnode(key[:(ln+31)/32], ln, 0)
 		return
 	}
 	var (
@@ -152,7 +163,7 @@ func (t *tree160) addRoute(key []uint32, ln byte, value unsafe.Pointer, replace 
 		node  *btrienode160
 		down  *btrienode160
 	)
-	if exact, node = t.findBestMatch(key, ln, nil); exact {
+	if exact, node, _ = t.findBestMatch(key, ln); exact {
 		if node.dummy != 0 {
 			node.dummy = 0
 			node.data = value
@@ -172,8 +183,7 @@ func (t *tree160) addRoute(key []uint32, ln byte, value unsafe.Pointer, replace 
 		}
 		return
 	}
-	newnode := &btrienode160{data: value, prefixlen: ln}
-	copy(newnode.bits[:], key[:(ln+31)/32])
+	newnode := t.newnode(key[:(ln+31)/32], ln, 0)
 	if node != nil {
 		if hasBit(key, node.prefixlen+1) {
 			if node.a == nil {
@@ -251,8 +261,7 @@ func (t *tree160) addRoute(key []uint32, ln byte, value unsafe.Pointer, replace 
 		}
 	} else {
 		// down and newnode should have new empty parent
-		node = &btrienode160{dummy: 1, prefixlen: matched}
-		copy(node.bits[:], key[:(ln+31)/32])
+		node = t.newnode(key[:(ln+31)/32], matched, 1)
 		use_a := hasBit(down.bits[:], matched+1)
 		if use_a == hasBit(newnode.bits[:], matched+1) {
 			panic("tangled branches while creating new intermediate parent")
@@ -296,4 +305,37 @@ func (t *tree160) addRoute(key []uint32, ln byte, value unsafe.Pointer, replace 
 		}
 	}
 	return
+}
+
+func New160() *Trie160 {
+	return &Trie160{new(tree160)}
+}
+
+func (rt *Trie160) Get(ip []byte, mask byte) (bool, []byte, byte, unsafe.Pointer) {
+	u32 := iptou(ip, mask)
+	exact, node, ct := rt.findBestMatch(u32, mask)
+
+	if node.dummy == 0 {
+		// dummy node means "no match"
+		return exact, utoip(node.bits[:], node.prefixlen), node.prefixlen, node.data
+	}
+
+	if ct != nil {
+		// accept container as the answer if it's present
+		return false, utoip(ct.bits[:], ct.prefixlen), ct.prefixlen, ct.data
+	}
+	return false, nil, 0, nil
+
+}
+
+func (rt *Trie160) Append(ip []byte, mask byte, value unsafe.Pointer) (bool, unsafe.Pointer) {
+	u32 := iptou(ip, mask)
+	set, olval := rt.addRoute(u32, mask, value, false)
+	return set, olval
+}
+
+func (rt *Trie160) Set(ip []byte, mask byte, value unsafe.Pointer) (bool, unsafe.Pointer) {
+	u32 := iptou(ip, mask)
+	set, olval := rt.addRoute(u32, mask, value, true)
+	return set, olval
 }
