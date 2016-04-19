@@ -2,6 +2,8 @@ package iptrie
 
 import (
 	"bytes"
+	"fmt"
+	"os"
 	"strings"
 	"testing"
 )
@@ -34,6 +36,7 @@ func TestTreeAppend(t *testing.T) {
 			got := strings.Replace(buf.String(), "\n", "\\n", -1)
 			if got != s.result {
 				t.Error(got, "!=", s.result)
+				fmt.Fprintln(os.Stderr, buf.String(), "\n")
 			}
 			buf.Reset()
 		}
@@ -52,4 +55,28 @@ func TestTreeAppend(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestNodeMatch(t *testing.T) {
+	b := &btrienode160{
+		bits:      [5]uint32{0x7f000000}, // 127.0.0.0/16
+		prefixlen: 16,
+	}
+	for i := byte(0); i <= 32; i++ {
+		// everyone inside 127.0.0.0/16 formed as 127.0.1.1/xx should match
+		if i < 16 {
+			if b.match([]uint32{0x7f000101}, i) {
+				t.Error("127.0.0.0/16 shoud not match to 127.0.0.1/xx when xx  is", i)
+			}
+		} else {
+			if !b.match([]uint32{0x7f000101}, i) {
+				t.Error("127.0.0.0/16 does not match to 127.0.1.1/xx when xx  is", i)
+			}
+		}
+	}
+
+	if b.match([]uint32{0x7f010000}, 16) {
+		t.Error("127.0.0.0/16 shoud not match to 127.1.0.0/16")
+	}
+
 }

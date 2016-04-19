@@ -27,19 +27,31 @@ func (node *btrienode32) sweep(f func(*btrienode32)) {
 	f(node)
 }
 
+// match returns true if key/ln is valid child of node or node itself
 func (node *btrienode32) match(key []uint32, ln byte) bool {
-	if ln <= 0 {
+	npl := node.prefixlen
+	if ln < npl {
+		return false
+	}
+
+	var mask uint32
+	if npl != 0 {
+		if npl%32 != 0 {
+			mask = ^(0xffffffff >> (npl % 32))
+		} else {
+			mask = 0xffffffff
+		}
+	} else {
 		return true
 	}
-	var i, m byte = 0, (ln - 1) / 32
-	for i = 0; i <= m; i++ {
-		if i < m { // match whole word, not close to end yet
-			if node.bits[i] != key[i] {
-				return false
-			}
-		} else {
-			var mask uint32 = ^(0xffffffff >> (ln % 32))
-			if (node.bits[i] & mask) != (key[i] & mask) {
+
+	m := (npl - 1) / 32
+	if node.bits[m]&mask != key[m]&mask {
+		return false
+	}
+	if m > 0 {
+		for bit := m - 1; bit >= 0; bit-- {
+			if node.bits[bit] != key[bit] {
 				return false
 			}
 		}
@@ -100,7 +112,7 @@ func (t *tree32) findBestMatch(key []uint32, ln byte) (bool, *btrienode32, *btri
 		parent  *btrienode32
 		node    = t.btrienode32
 	)
-	for node != nil && node.prefixlen <= ln && node.match(key, node.prefixlen) {
+	for node != nil && node.match(key, ln) {
 		if parent != nil && parent.dummy == 0 {
 			cparent = parent
 		}
@@ -340,19 +352,31 @@ func (node *btrienode64) sweep(f func(*btrienode64)) {
 	f(node)
 }
 
+// match returns true if key/ln is valid child of node or node itself
 func (node *btrienode64) match(key []uint32, ln byte) bool {
-	if ln <= 0 {
+	npl := node.prefixlen
+	if ln < npl {
+		return false
+	}
+
+	var mask uint32
+	if npl != 0 {
+		if npl%32 != 0 {
+			mask = ^(0xffffffff >> (npl % 32))
+		} else {
+			mask = 0xffffffff
+		}
+	} else {
 		return true
 	}
-	var i, m byte = 0, (ln - 1) / 32
-	for i = 0; i <= m; i++ {
-		if i < m { // match whole word, not close to end yet
-			if node.bits[i] != key[i] {
-				return false
-			}
-		} else {
-			var mask uint32 = ^(0xffffffff >> (ln % 32))
-			if (node.bits[i] & mask) != (key[i] & mask) {
+
+	m := (npl - 1) / 32
+	if node.bits[m]&mask != key[m]&mask {
+		return false
+	}
+	if m > 0 {
+		for bit := m - 1; bit >= 0; bit-- {
+			if node.bits[bit] != key[bit] {
 				return false
 			}
 		}
@@ -413,7 +437,7 @@ func (t *tree64) findBestMatch(key []uint32, ln byte) (bool, *btrienode64, *btri
 		parent  *btrienode64
 		node    = t.btrienode64
 	)
-	for node != nil && node.prefixlen <= ln && node.match(key, node.prefixlen) {
+	for node != nil && node.match(key, ln) {
 		if parent != nil && parent.dummy == 0 {
 			cparent = parent
 		}
@@ -653,19 +677,31 @@ func (node *btrienode128) sweep(f func(*btrienode128)) {
 	f(node)
 }
 
+// match returns true if key/ln is valid child of node or node itself
 func (node *btrienode128) match(key []uint32, ln byte) bool {
-	if ln <= 0 {
+	npl := node.prefixlen
+	if ln < npl {
+		return false
+	}
+
+	var mask uint32
+	if npl != 0 {
+		if npl%32 != 0 {
+			mask = ^(0xffffffff >> (npl % 32))
+		} else {
+			mask = 0xffffffff
+		}
+	} else {
 		return true
 	}
-	var i, m byte = 0, (ln - 1) / 32
-	for i = 0; i <= m; i++ {
-		if i < m { // match whole word, not close to end yet
-			if node.bits[i] != key[i] {
-				return false
-			}
-		} else {
-			var mask uint32 = ^(0xffffffff >> (ln % 32))
-			if (node.bits[i] & mask) != (key[i] & mask) {
+
+	m := (npl - 1) / 32
+	if node.bits[m]&mask != key[m]&mask {
+		return false
+	}
+	if m > 0 {
+		for bit := m - 1; bit >= 0; bit-- {
+			if node.bits[bit] != key[bit] {
 				return false
 			}
 		}
@@ -726,7 +762,7 @@ func (t *tree128) findBestMatch(key []uint32, ln byte) (bool, *btrienode128, *bt
 		parent  *btrienode128
 		node    = t.btrienode128
 	)
-	for node != nil && node.prefixlen <= ln && node.match(key, node.prefixlen) {
+	for node != nil && node.match(key, ln) {
 		if parent != nil && parent.dummy == 0 {
 			cparent = parent
 		}

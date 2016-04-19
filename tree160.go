@@ -10,7 +10,7 @@ import (
 const MAXBITS = 160 // max length is IPV6+32bitASN
 
 func hasBit(k []uint32, b byte) bool {
-	return (k[(b-1)/32] >> (31 - ((b - 1) % 32)) & 0x1) == 1
+	return (k[(b-1)/32] >> (31 - ((b - 1) % 32)) & 0x1) != 0
 }
 
 func keyStr(s []uint32, ln byte) string {
@@ -47,19 +47,31 @@ func (node *btrienode160) sweep(f func(*btrienode160)) {
 	f(node)
 }
 
+// match returns true if key/ln is valid child of node or node itself
 func (node *btrienode160) match(key []uint32, ln byte) bool {
-	if ln <= 0 {
+	npl := node.prefixlen
+	if ln < npl {
+		return false
+	}
+
+	var mask uint32
+	if npl != 0 {
+		if npl%32 != 0 {
+			mask = ^(0xffffffff >> (npl % 32))
+		} else {
+			mask = 0xffffffff
+		}
+	} else {
 		return true
 	}
-	var i, m byte = 0, (ln - 1) / 32
-	for i = 0; i <= m; i++ {
-		if i < m { // match whole word, not close to end yet
-			if node.bits[i] != key[i] {
-				return false
-			}
-		} else {
-			var mask uint32 = ^(0xffffffff >> (ln % 32))
-			if (node.bits[i] & mask) != (key[i] & mask) {
+
+	m := (npl - 1) / 32
+	if node.bits[m]&mask != key[m]&mask {
+		return false
+	}
+	if m > 0 {
+		for bit := m - 1; bit >= 0; bit-- {
+			if node.bits[bit] != key[bit] {
 				return false
 			}
 		}
@@ -120,7 +132,7 @@ func (t *tree160) findBestMatch(key []uint32, ln byte) (bool, *btrienode160, *bt
 		parent  *btrienode160
 		node    = t.btrienode160
 	)
-	for node != nil && node.prefixlen <= ln && node.match(key, node.prefixlen) {
+	for node != nil && node.match(key, ln) {
 		if parent != nil && parent.dummy == 0 {
 			cparent = parent
 		}
