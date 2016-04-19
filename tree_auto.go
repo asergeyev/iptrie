@@ -295,7 +295,7 @@ func (rt *Trie32) Get(ip []byte, mask byte) (bool, []byte, byte, unsafe.Pointer)
 	u32 := iptou(ip, mask)
 	exact, node, ct := rt.findBestMatch(u32, mask)
 
-	if node.dummy == 0 {
+	if node != nil && node.dummy == 0 {
 		// dummy node means "no match"
 		return exact, utoip(node.bits[:], node.prefixlen), node.prefixlen, node.data
 	}
@@ -608,7 +608,7 @@ func (rt *Trie64) Get(ip []byte, mask byte) (bool, []byte, byte, unsafe.Pointer)
 	u32 := iptou(ip, mask)
 	exact, node, ct := rt.findBestMatch(u32, mask)
 
-	if node.dummy == 0 {
+	if node != nil && node.dummy == 0 {
 		// dummy node means "no match"
 		return exact, utoip(node.bits[:], node.prefixlen), node.prefixlen, node.data
 	}
@@ -921,7 +921,7 @@ func (rt *Trie128) Get(ip []byte, mask byte) (bool, []byte, byte, unsafe.Pointer
 	u32 := iptou(ip, mask)
 	exact, node, ct := rt.findBestMatch(u32, mask)
 
-	if node.dummy == 0 {
+	if node != nil && node.dummy == 0 {
 		// dummy node means "no match"
 		return exact, utoip(node.bits[:], node.prefixlen), node.prefixlen, node.data
 	}

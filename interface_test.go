@@ -66,4 +66,22 @@ func TestTrieBestMatch(t *testing.T) {
 	if exact || ln != 16 || !bytes.Equal(ip, []byte{1, 2, 0, 0}) {
 		t.Errorf("Expected to find 1.2.0/16 but got: %v/%d", ip, ln)
 	}
+
+	// Check 0.0.0.0
+	exact, ip, ln, _ = T.Get([]byte{0, 0, 0, 0}, 0)
+	if exact {
+		t.Errorf("Found 0/0 before it was added. Got: %v/%d", ip, ln)
+	}
+
+	T.Append([]byte{0, 0, 0, 0}, 0, nil)
+	exact, ip, ln, _ = T.Get([]byte{0, 0, 0, 0}, 0)
+	if !exact {
+		t.Errorf("Expected to find 0.0.0/16 but got: %v/%d", ip, ln)
+	}
+
+	exact, ip, ln, _ = T.Get([]byte{100, 200, 0, 0}, 16)
+	if exact || ln != 0 || len(ip) > 0 {
+		t.Errorf("Expected to find 0.0.0/16 but got: %v/%d", ip, ln)
+	}
+
 }

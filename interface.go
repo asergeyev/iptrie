@@ -12,8 +12,8 @@ var DEBUG io.Writer
 
 func iptou(ip []byte, mask byte) []uint32 {
 	iplen := len(ip)
-	if iplen == 0 {
-		panic("Unable to look for empty key")
+	if iplen == 0 || mask == 0 {
+		return []uint32{0}
 	}
 	if iplen < int(mask>>3) { // mask / 8
 		panic("Unable to look for empty key that's shorter than it's mask")
@@ -43,7 +43,7 @@ func iptou(ip []byte, mask byte) []uint32 {
 }
 
 func utoip(words []uint32, mask byte) []byte {
-	ln := ((mask + 31) / 32) * 4
+	ln := ((mask + 31) / 32) * 4 // yes, return 0.0.0.0 and ::0 as empty array
 	ret := make([]byte, ln)
 	for i := byte(0); i < ln; i += 4 {
 		binary.BigEndian.PutUint32(ret[i:], words[i/4])
