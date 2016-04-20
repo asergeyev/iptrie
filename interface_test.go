@@ -89,7 +89,7 @@ func TestTrieBestMatch(t *testing.T) {
 
 }
 
-func BenchmarkAppends(b *testing.B) {
+func BenchmarkAppend32(b *testing.B) {
 	b.StopTimer()
 	var addrs = make([][]byte, 0, b.N)
 	var mask = make([]byte, 0, b.N)
@@ -97,11 +97,35 @@ func BenchmarkAppends(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		u32 := rand.Uint32()
 		addrs = append(addrs, []byte{byte(u32 >> 24), byte(u32 >> 16), byte(u32 >> 8), byte(u32)})
-		mask = append(mask, byte((rand.Uint32()%24)+8))
+		mask = append(mask, byte((rand.Uint32()%24)+8)) // 8 to 32
 	}
 
 	b.StartTimer()
 	var T = New32()
+	var value = unsafe.Pointer(T) // does not matter where it points to
+	for i := 0; i < b.N; i++ {
+		T.Append(addrs[i], mask[i], value)
+	}
+}
+
+func BenchmarkAppend128(b *testing.B) {
+	b.StopTimer()
+	var addrs = make([][]byte, 0, b.N)
+	var mask = make([]byte, 0, b.N)
+	rand.Seed(int64(time.Now().Nanosecond()))
+	for i := 0; i < b.N; i++ {
+		u32 := rand.Uint32()
+		// assume for fun that they all are in same 2001:: - 20ff space
+		addrs = append(addrs, []byte{
+			0x20, byte(u32), byte(u32 >> 24), 0,
+			byte(u32 >> 16), 0, byte(u32 >> 8), 0,
+			byte(u32), byte(u32 >> 24), byte(u32 >> 16), byte(u32 >> 8),
+			byte(u32), byte(u32 >> 8), byte(u32), 1,
+		})
+		mask = append(mask, byte((rand.Uint32()%32)+32)) // 32 to 64
+	}
+	b.StartTimer()
+	var T = New128()
 	var value = unsafe.Pointer(T) // does not matter where it points to
 	for i := 0; i < b.N; i++ {
 		T.Append(addrs[i], mask[i], value)

@@ -39,16 +39,15 @@ func (node *btrienode32) match(key []uint32, ln byte) bool {
 		if npl%32 != 0 {
 			mask = ^(0xffffffff >> (npl % 32))
 		} else {
-			//return bytes.Equals
 			mask = 0xffffffff
 		}
 		if npl <= 32 {
 			return node.bits[0]&mask == key[0]&mask
 		}
 
-		m := (npl - 1) / 32
-		for m--; m >= 0; m-- {
-			if node.bits[m] != key[m] {
+		m := int(npl-1) / 32
+		for s := m - 1; s >= 0; s-- {
+			if node.bits[s] != key[s] {
 				return false
 			}
 		}
@@ -61,24 +60,32 @@ func (node *btrienode32) match(key []uint32, ln byte) bool {
 
 func (node *btrienode32) bitsMatched(key []uint32, ln byte) byte {
 	maxlen := node.prefixlen
-	if ln > maxlen {
+	if ln < maxlen {
 		maxlen = ln
 	}
-	var plen byte
-	for n, word := range node.bits {
-		var mask, trymask uint32
-		for mask != 0xffffffff && plen < maxlen {
-			trymask = (mask >> 1) | 0x80000000 // move 1 and set 32nd bit to 1
-			if (word & trymask) != (key[n] & trymask) {
-				break
-			}
-			mask = trymask
-			plen++
-		}
-		if mask != 0xffffffff || plen >= maxlen {
+	if maxlen == 0 {
+		return 0
+	}
+	var n, plen byte
+	for n = 0; n < maxlen/32; n++ {
+		// how many should be equal?
+		if key[n] != node.bits[n] {
+			// compare that bit
 			break
 		}
+		plen += 32 // skip checking every bit in this word
 	}
+
+	var mask uint32
+
+	for plen < maxlen {
+		mask = (mask >> 1) | 0x80000000 // move 1 and set 32nd bit to 1
+		if (node.bits[n] & mask) != (key[n] & mask) {
+			break
+		}
+		plen++
+	}
+
 	return plen
 }
 
@@ -364,16 +371,15 @@ func (node *btrienode64) match(key []uint32, ln byte) bool {
 		if npl%32 != 0 {
 			mask = ^(0xffffffff >> (npl % 32))
 		} else {
-			//return bytes.Equals
 			mask = 0xffffffff
 		}
 		if npl <= 32 {
 			return node.bits[0]&mask == key[0]&mask
 		}
 
-		m := (npl - 1) / 32
-		for m--; m >= 0; m-- {
-			if node.bits[m] != key[m] {
+		m := int(npl-1) / 32
+		for s := m - 1; s >= 0; s-- {
+			if node.bits[s] != key[s] {
 				return false
 			}
 		}
@@ -386,24 +392,32 @@ func (node *btrienode64) match(key []uint32, ln byte) bool {
 
 func (node *btrienode64) bitsMatched(key []uint32, ln byte) byte {
 	maxlen := node.prefixlen
-	if ln > maxlen {
+	if ln < maxlen {
 		maxlen = ln
 	}
-	var plen byte
-	for n, word := range node.bits {
-		var mask, trymask uint32
-		for mask != 0xffffffff && plen < maxlen {
-			trymask = (mask >> 1) | 0x80000000 // move 1 and set 32nd bit to 1
-			if (word & trymask) != (key[n] & trymask) {
-				break
-			}
-			mask = trymask
-			plen++
-		}
-		if mask != 0xffffffff || plen >= maxlen {
+	if maxlen == 0 {
+		return 0
+	}
+	var n, plen byte
+	for n = 0; n < maxlen/32; n++ {
+		// how many should be equal?
+		if key[n] != node.bits[n] {
+			// compare that bit
 			break
 		}
+		plen += 32 // skip checking every bit in this word
 	}
+
+	var mask uint32
+
+	for plen < maxlen {
+		mask = (mask >> 1) | 0x80000000 // move 1 and set 32nd bit to 1
+		if (node.bits[n] & mask) != (key[n] & mask) {
+			break
+		}
+		plen++
+	}
+
 	return plen
 }
 
@@ -689,16 +703,15 @@ func (node *btrienode128) match(key []uint32, ln byte) bool {
 		if npl%32 != 0 {
 			mask = ^(0xffffffff >> (npl % 32))
 		} else {
-			//return bytes.Equals
 			mask = 0xffffffff
 		}
 		if npl <= 32 {
 			return node.bits[0]&mask == key[0]&mask
 		}
 
-		m := (npl - 1) / 32
-		for m--; m >= 0; m-- {
-			if node.bits[m] != key[m] {
+		m := int(npl-1) / 32
+		for s := m - 1; s >= 0; s-- {
+			if node.bits[s] != key[s] {
 				return false
 			}
 		}
@@ -711,24 +724,32 @@ func (node *btrienode128) match(key []uint32, ln byte) bool {
 
 func (node *btrienode128) bitsMatched(key []uint32, ln byte) byte {
 	maxlen := node.prefixlen
-	if ln > maxlen {
+	if ln < maxlen {
 		maxlen = ln
 	}
-	var plen byte
-	for n, word := range node.bits {
-		var mask, trymask uint32
-		for mask != 0xffffffff && plen < maxlen {
-			trymask = (mask >> 1) | 0x80000000 // move 1 and set 32nd bit to 1
-			if (word & trymask) != (key[n] & trymask) {
-				break
-			}
-			mask = trymask
-			plen++
-		}
-		if mask != 0xffffffff || plen >= maxlen {
+	if maxlen == 0 {
+		return 0
+	}
+	var n, plen byte
+	for n = 0; n < maxlen/32; n++ {
+		// how many should be equal?
+		if key[n] != node.bits[n] {
+			// compare that bit
 			break
 		}
+		plen += 32 // skip checking every bit in this word
 	}
+
+	var mask uint32
+
+	for plen < maxlen {
+		mask = (mask >> 1) | 0x80000000 // move 1 and set 32nd bit to 1
+		if (node.bits[n] & mask) != (key[n] & mask) {
+			break
+		}
+		plen++
+	}
+
 	return plen
 }
 

@@ -11,12 +11,12 @@ import (
 var DEBUG io.Writer
 
 func iptou(ip []byte, mask byte) []uint32 {
-	iplen := len(ip)
-	if iplen == 0 || mask == 0 {
+	if mask == 0 {
 		return []uint32{0}
 	}
-	if iplen < int(mask>>3) { // mask / 8
-		panic("Unable to look for empty key that's shorter than it's mask")
+	iplen := int(mask >> 3)
+	if iplen > len(ip) { // mask / 8
+		panic("Unable to look for key that's shorter than it's mask")
 	}
 
 	u32 := make([]uint32, (mask+31)/32)
