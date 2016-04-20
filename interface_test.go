@@ -2,7 +2,10 @@ package iptrie
 
 import (
 	"bytes"
+	"math/rand"
 	"testing"
+	"time"
+	"unsafe"
 )
 
 func TestTrieInterface(t *testing.T) {
@@ -84,4 +87,23 @@ func TestTrieBestMatch(t *testing.T) {
 		t.Errorf("Expected to find 0.0.0/16 but got: %v/%d", ip, ln)
 	}
 
+}
+
+func BenchmarkAppends(b *testing.B) {
+	b.StopTimer()
+	var addrs = make([][]byte, 0, b.N)
+	var mask = make([]byte, 0, b.N)
+	rand.Seed(int64(time.Now().Nanosecond()))
+	for i := 0; i < b.N; i++ {
+		u32 := rand.Uint32()
+		addrs = append(addrs, []byte{byte(u32 >> 24), byte(u32 >> 16), byte(u32 >> 8), byte(u32)})
+		mask = append(mask, byte((rand.Uint32()%24)+8))
+	}
+
+	b.StartTimer()
+	var T = New32()
+	var value = unsafe.Pointer(T) // does not matter where it points to
+	for i := 0; i < b.N; i++ {
+		T.Append(addrs[i], mask[i], value)
+	}
 }
