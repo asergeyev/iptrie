@@ -54,26 +54,25 @@ func (node *btrienode160) match(key []uint32, ln byte) bool {
 		return false
 	}
 
-	var mask uint32
 	if npl != 0 {
+		var mask uint32
 		if npl%32 != 0 {
 			mask = ^(0xffffffff >> (npl % 32))
 		} else {
 			mask = 0xffffffff
 		}
-	} else {
-		return true
-	}
+		if npl <= 32 {
+			return node.bits[0]&mask == key[0]&mask
+		}
 
-	m := (npl - 1) / 32
-	if node.bits[m]&mask != key[m]&mask {
-		return false
-	}
-	if m > 0 {
-		for bit := m - 1; bit >= 0; bit-- {
-			if node.bits[bit] != key[bit] {
+		m := (npl - 1) / 32
+		for m--; m >= 0; m-- {
+			if node.bits[m] != key[m] {
 				return false
 			}
+		}
+		if node.bits[m]&mask != key[m]&mask {
+			return false
 		}
 	}
 	return true
