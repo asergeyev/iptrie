@@ -33,16 +33,10 @@ func (node *Node32) sweep(level int, f func(int, *Node32)) {
 }
 
 func (node *Node32) ip() []byte {
-	words := (node.prefixlen + 31) / 32
-	if words == 1 {
-		// quickpath
-		var r [4]byte
-		r[0], r[1], r[2], r[3] = byte(node.bits[0]>>24), byte(node.bits[0]>>16), byte(node.bits[0]>>8), byte(node.bits[0])
-		return r[:]
-	}
+	words := int(node.prefixlen+31) / 32
 	s := make([]byte, 4*words)
-	for i, u32 := range node.bits[:words] {
-		start := i * 4
+	for i := 0; i < words; i++ {
+		u32, start := node.bits[i], i*4
 		s[start], s[start+1], s[start+2], s[start+3] = byte(u32>>24), byte(u32>>16), byte(u32>>8), byte(u32)
 	}
 	return s
@@ -348,7 +342,7 @@ func (rt *Trie32) Set(ip []byte, mask byte, value unsafe.Pointer) (bool, *Node32
 func (rt *Trie32) GetNode(ip []byte, mask byte) (bool, *Node32) {
 	exact, node, ct := rt.node.findBestMatch(ip, mask)
 	if exact {
-		return false, node // even if it's dummy
+		return node.IsDummy(), node // if node is a dummy it needs to look like "just added"
 	}
 	if node != nil {
 		_, node = rt.addToNode(node, ip, mask, nil, false)
@@ -402,16 +396,10 @@ func (node *Node64) sweep(level int, f func(int, *Node64)) {
 }
 
 func (node *Node64) ip() []byte {
-	words := (node.prefixlen + 31) / 32
-	if words == 1 {
-		// quickpath
-		var r [4]byte
-		r[0], r[1], r[2], r[3] = byte(node.bits[0]>>24), byte(node.bits[0]>>16), byte(node.bits[0]>>8), byte(node.bits[0])
-		return r[:]
-	}
+	words := int(node.prefixlen+31) / 32
 	s := make([]byte, 4*words)
-	for i, u32 := range node.bits[:words] {
-		start := i * 4
+	for i := 0; i < words; i++ {
+		u32, start := node.bits[i], i*4
 		s[start], s[start+1], s[start+2], s[start+3] = byte(u32>>24), byte(u32>>16), byte(u32>>8), byte(u32)
 	}
 	return s
@@ -717,7 +705,7 @@ func (rt *Trie64) Set(ip []byte, mask byte, value unsafe.Pointer) (bool, *Node64
 func (rt *Trie64) GetNode(ip []byte, mask byte) (bool, *Node64) {
 	exact, node, ct := rt.node.findBestMatch(ip, mask)
 	if exact {
-		return false, node // even if it's dummy
+		return node.IsDummy(), node // if node is a dummy it needs to look like "just added"
 	}
 	if node != nil {
 		_, node = rt.addToNode(node, ip, mask, nil, false)
@@ -771,16 +759,10 @@ func (node *Node128) sweep(level int, f func(int, *Node128)) {
 }
 
 func (node *Node128) ip() []byte {
-	words := (node.prefixlen + 31) / 32
-	if words == 1 {
-		// quickpath
-		var r [4]byte
-		r[0], r[1], r[2], r[3] = byte(node.bits[0]>>24), byte(node.bits[0]>>16), byte(node.bits[0]>>8), byte(node.bits[0])
-		return r[:]
-	}
+	words := int(node.prefixlen+31) / 32
 	s := make([]byte, 4*words)
-	for i, u32 := range node.bits[:words] {
-		start := i * 4
+	for i := 0; i < words; i++ {
+		u32, start := node.bits[i], i*4
 		s[start], s[start+1], s[start+2], s[start+3] = byte(u32>>24), byte(u32>>16), byte(u32>>8), byte(u32)
 	}
 	return s
@@ -1086,7 +1068,7 @@ func (rt *Trie128) Set(ip []byte, mask byte, value unsafe.Pointer) (bool, *Node1
 func (rt *Trie128) GetNode(ip []byte, mask byte) (bool, *Node128) {
 	exact, node, ct := rt.node.findBestMatch(ip, mask)
 	if exact {
-		return false, node // even if it's dummy
+		return node.IsDummy(), node // if node is a dummy it needs to look like "just added"
 	}
 	if node != nil {
 		_, node = rt.addToNode(node, ip, mask, nil, false)
