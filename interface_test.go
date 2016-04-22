@@ -89,45 +89,76 @@ func TestTrieBestMatch(t *testing.T) {
 
 }
 
-func BenchmarkAppend32(b *testing.B) {
-	b.StopTimer()
-	var addrs = make([][]byte, 0, b.N)
-	var mask = make([]byte, 0, b.N)
-	rand.Seed(int64(time.Now().Nanosecond()))
-	for i := 0; i < b.N; i++ {
-		u32 := rand.Uint32()
-		addrs = append(addrs, []byte{byte(u32 >> 24), byte(u32 >> 16), byte(u32 >> 8), byte(u32)})
-		mask = append(mask, byte((rand.Uint32()%24)+8)) // 8 to 32
-	}
+var MAXBENCH = 1500000 // realistic expectations
+var addrs32 = make([][]byte, MAXBENCH)
+var mask32 = make([]byte, MAXBENCH)
+var addrs128 = make([][]byte, MAXBENCH)
+var mask128 = make([]byte, MAXBENCH)
 
-	b.StartTimer()
-	var T = New32()
-	var value = unsafe.Pointer(T) // does not matter where it points to
-	for i := 0; i < b.N; i++ {
-		T.Append(addrs[i], mask[i], value)
-	}
-}
-
-func BenchmarkAppend128(b *testing.B) {
-	b.StopTimer()
-	var addrs = make([][]byte, 0, b.N)
-	var mask = make([]byte, 0, b.N)
+func init() {
 	rand.Seed(int64(time.Now().Nanosecond()))
-	for i := 0; i < b.N; i++ {
+	for _ = range mask32 {
 		u32 := rand.Uint32()
-		// assume for fun that they all are in same 2001:: - 20ff space
-		addrs = append(addrs, []byte{
+		mask32 = append(mask32, byte((rand.Uint32()%24)+8)) // 8 to 32
+		//addrs32 = append(addrs32, utoip(iptou([]byte{byte(u32 >> 24), byte(u32 >> 16), byte(u32 >> 8), byte(u32)}, mask32[i]), mask32[i]))
+		addrs32 = append(addrs32, []byte{byte(u32 >> 24), byte(u32 >> 16), byte(u32 >> 8), byte(u32)})
+	}
+	for _ = range mask128 {
+		u32 := rand.Uint32()
+		mask128 = append(mask128, byte((rand.Uint32()%32)+32)) // 32 to 64
+		addrs128 = append(addrs128, []byte{
 			0x20, byte(u32), byte(u32 >> 24), 0,
 			byte(u32 >> 16), 0, byte(u32 >> 8), 0,
 			byte(u32), byte(u32 >> 24), byte(u32 >> 16), byte(u32 >> 8),
 			byte(u32), byte(u32 >> 8), byte(u32), 1,
 		})
-		mask = append(mask, byte((rand.Uint32()%32)+32)) // 32 to 64
 	}
-	b.StartTimer()
+}
+
+func BenchmarkAppend32(b *testing.B) {
+	if b.N > MAXBENCH {
+		b.N = MAXBENCH
+	}
+	var T = New32()
+	var value = unsafe.Pointer(T) // does not matter where it points to
+	for i := 0; i < b.N; i++ {
+		T.Append(addrs32[i], mask32[i], value)
+	}
+}
+
+func BenchmarkAppend128(b *testing.B) {
+	if b.N > MAXBENCH {
+		b.N = MAXBENCH
+	}
 	var T = New128()
 	var value = unsafe.Pointer(T) // does not matter where it points to
 	for i := 0; i < b.N; i++ {
-		T.Append(addrs[i], mask[i], value)
+		T.Append(addrs128[i], mask128[i], value)
 	}
+}
+
+func BenchmarkGet32(b *testing.B) {
+	if b.N > MAXBENCH {
+		b.N = MAXBENCH
+	}
+	var T = New32()
+	for i := 0; i < b.N; i++ {
+		T.Append(addrs32[i], mask32[i], unsafe.Pointer(T))
+	}
+	if testing.Verbose() {
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			ex, ip, ln, value := T.Get(addrs32[i], mask32[i])
+			if !ex {
+				b.Error("Not exact get!", i, utoip(iptou(addrs32[i], mask32[i]), mask32[i]), mask32[i], utoip(iptou(ip, ln), ln), ln)
+			} else if value == nil {
+				b.Error("Incorrect get value!")
+			}
+		}
+	} else {
+		for i := 0; i < b.N; i++ {
+			T.Get(addrs32[i], mask32[i])
+		}
+	}
+	return
 }

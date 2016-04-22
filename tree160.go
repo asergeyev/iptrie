@@ -27,6 +27,12 @@ func keyStr(s []uint32, ln byte) string {
 
 //go:generate go run ./tree_generate.go -o tree_auto.go
 
+type Trie160 struct {
+	*tree160
+}
+
+type Node160 btrienode160
+
 type btrienode160 struct {
 	a, b      *btrienode160
 	data      unsafe.Pointer
@@ -36,15 +42,15 @@ type btrienode160 struct {
 }
 
 // sweep goes thru whole subtree calling f. Could be used for cleanup,
-// e.g.  tree.sweep(func(n *node) { n.a, n.b, n.data = nil, nil, nil })
-func (node *btrienode160) sweep(f func(*btrienode160)) {
+// e.g.  tree.sweep(0, func(_ int, n *node) { n.a, n.b, n.data = nil, nil, nil })
+func (node *btrienode160) sweep(level int, f func(int, *btrienode160)) {
 	if node.a != nil {
-		f(node.a)
+		node.a.sweep(level+1, f)
 	}
 	if node.b != nil {
-		f(node.b)
+		node.b.sweep(level+1, f)
 	}
-	f(node)
+	f(level, node)
 }
 
 // match returns true if key/ln is valid child of node or node itself
@@ -79,15 +85,15 @@ func (node *btrienode160) match(key []uint32, ln byte) bool {
 }
 
 func (node *btrienode160) bitsMatched(key []uint32, ln byte) byte {
-	maxlen := node.prefixlen
-	if ln < maxlen {
-		maxlen = ln
+	npl := node.prefixlen
+	if ln < npl {
+		npl = ln // limit matching to min length
 	}
-	if maxlen == 0 {
+	if npl == 0 {
 		return 0
 	}
 	var n, plen byte
-	for n = 0; n < maxlen/32; n++ {
+	for n = 0; n < npl/32; n++ {
 		// how many should be equal?
 		if key[n] != node.bits[n] {
 			// compare that bit
@@ -98,7 +104,7 @@ func (node *btrienode160) bitsMatched(key []uint32, ln byte) byte {
 
 	var mask uint32
 
-	for plen < maxlen {
+	for plen < npl {
 		mask = (mask >> 1) | 0x80000000 // move 1 and set 32nd bit to 1
 		if (node.bits[n] & mask) != (key[n] & mask) {
 			break
@@ -164,7 +170,7 @@ func (t *tree160) findBestMatch(key []uint32, ln byte) (bool, *btrienode160, *bt
 	return exact, parent, cparent
 }
 
-func (t *tree160) addRoute(key []uint32, ln byte, value unsafe.Pointer, replace bool) (set bool, oldval unsafe.Pointer) {
+func (t *tree160) addRoute(key []uint32, ln byte, value unsafe.Pointer, replace bool) (set bool, newnode *btrienode160) {
 	if ln > MAXBITS {
 		panic("Unable to add prefix longer than MAXBITS")
 	}
@@ -175,6 +181,7 @@ func (t *tree160) addRoute(key []uint32, ln byte, value unsafe.Pointer, replace 
 			fmt.Fprintf(DEBUG, "root=%s (no subtree)\n", keyStr(key, ln))
 		}
 		t.btrienode160 = t.newnode(key[:(ln+31)/32], ln, 0)
+		t.btrienode160.data = value
 		return
 	}
 	var (
@@ -190,7 +197,6 @@ func (t *tree160) addRoute(key []uint32, ln byte, value unsafe.Pointer, replace 
 				fmt.Fprintf(DEBUG, "setting empty child's %v/%d value\n", key, ln)
 			}
 		} else {
-			oldval = node.data
 			if replace {
 				node.data = value
 			} else {
@@ -200,9 +206,10 @@ func (t *tree160) addRoute(key []uint32, ln byte, value unsafe.Pointer, replace 
 				fmt.Fprintf(DEBUG, "hit previously set %v/%d node\n", key, ln)
 			}
 		}
-		return
+		return set, node
 	}
-	newnode := t.newnode(key[:(ln+31)/32], ln, 0)
+	newnode = t.newnode(key[:(ln+31)/32], ln, 0)
+	newnode.data = value
 	if node != nil {
 		if hasBit(key, node.prefixlen+1) {
 			if node.a == nil {
@@ -210,7 +217,7 @@ func (t *tree160) addRoute(key []uint32, ln byte, value unsafe.Pointer, replace 
 				if DEBUG != nil {
 					fmt.Fprintf(DEBUG, "a-child %s for %s\n", keyStr(key, ln), keyStr(node.bits[:], node.prefixlen))
 				}
-				return
+				return set, newnode
 			}
 			// newnode fits between node and node.a
 			down = node.a
@@ -220,7 +227,7 @@ func (t *tree160) addRoute(key []uint32, ln byte, value unsafe.Pointer, replace 
 				if DEBUG != nil {
 					fmt.Fprintf(DEBUG, "b-child %s for %s\n", keyStr(key, ln), keyStr(node.bits[:], node.prefixlen))
 				}
-				return
+				return set, newnode
 			}
 			// newnode fits between node and node.b
 			down = node.b
@@ -235,29 +242,26 @@ func (t *tree160) addRoute(key []uint32, ln byte, value unsafe.Pointer, replace 
 		panic("parent's prefix could not be larger than key len")
 	}
 
-	matched := down.bitsMatched(key, ln)
-	if matched > ln {
-		matched = ln
-	}
+	matched := down.bitsMatched(newnode.bits[:], ln)
 
-	if matched == ln { // matched >=ln to remove that if above
-		// down matches key fully, so new branch would start from here
-		var plen byte = 1
-		if parent != nil {
-			// also make sure we're not messed up branch direction
-			plen = parent.prefixlen + 1
-		}
-		use_a := hasBit(newnode.bits[:], plen)
-		if use_a != hasBit(down.bits[:], plen) {
-			panic("something is wrong with branch that we intend to append to")
-		}
-		if use_a {
+	// Well. We fit somewhere between parent and down
+	// parent.bits match up to parent.prefixlen          1111111111100000000000
+	//                                                   11111111111..11
+	// down.bits match up to matched                     11111111111..1111
+
+	if matched == ln {
+		// down is child of key
+		if hasBit(down.bits[:], ln+1) {
 			newnode.a = down
 		} else {
 			newnode.b = down
 		}
 		if parent != nil {
-			if hasBit(newnode.bits[:], plen) {
+			use_a := hasBit(newnode.bits[:], parent.prefixlen+1)
+			if use_a != hasBit(down.bits[:], parent.prefixlen+1) {
+				panic("something is wrong with branch that we intend to append to")
+			}
+			if use_a {
 				if DEBUG != nil {
 					fmt.Fprintf(DEBUG, "insert a-child %s to %s before %s\n", keyStr(key, ln), keyStr(parent.bits[:], parent.prefixlen), keyStr(down.bits[:], down.prefixlen))
 				}
@@ -271,7 +275,7 @@ func (t *tree160) addRoute(key []uint32, ln byte, value unsafe.Pointer, replace 
 		} else {
 			if DEBUG != nil {
 				m := "b"
-				if use_a {
+				if hasBit(newnode.bits[:], 1) {
 					m = "a"
 				}
 				fmt.Fprintf(DEBUG, "root=%s (uses %s as %s-child)\n", keyStr(key, ln), keyStr(down.bits[:], down.prefixlen), m)
@@ -279,7 +283,7 @@ func (t *tree160) addRoute(key []uint32, ln byte, value unsafe.Pointer, replace 
 			t.btrienode160 = newnode
 		}
 	} else {
-		// down and newnode should have new empty parent
+		// down and newnode should have new dummy parent under parent
 		node = t.newnode(key[:(ln+31)/32], matched, 1)
 		use_a := hasBit(down.bits[:], matched+1)
 		if use_a == hasBit(newnode.bits[:], matched+1) {
@@ -301,7 +305,7 @@ func (t *tree160) addRoute(key []uint32, ln byte, value unsafe.Pointer, replace 
 
 		//insert b-child 1.2.3.0/25 to 1.2.3.0/24 before 1.2.3.0/29
 		if parent != nil {
-			if hasBit(newnode.bits[:], parent.prefixlen+1) {
+			if hasBit(node.bits[:], parent.prefixlen+1) {
 				parent.a = node
 				if DEBUG != nil {
 					fmt.Fprintf(DEBUG, "insert a-child %s to %s before %s\n", keyStr(node.bits[:], node.prefixlen), keyStr(parent.bits[:], parent.prefixlen), keyStr(node.a.bits[:], node.a.prefixlen))
@@ -323,6 +327,7 @@ func (t *tree160) addRoute(key []uint32, ln byte, value unsafe.Pointer, replace 
 			t.btrienode160 = node
 		}
 	}
+
 	return
 }
 
@@ -347,14 +352,14 @@ func (rt *Trie160) Get(ip []byte, mask byte) (bool, []byte, byte, unsafe.Pointer
 
 }
 
-func (rt *Trie160) Append(ip []byte, mask byte, value unsafe.Pointer) (bool, unsafe.Pointer) {
+func (rt *Trie160) Append(ip []byte, mask byte, value unsafe.Pointer) (bool, *Node160) {
 	u32 := iptou(ip, mask)
 	set, olval := rt.addRoute(u32, mask, value, false)
-	return set, olval
+	return set, (*Node160)(olval)
 }
 
-func (rt *Trie160) Set(ip []byte, mask byte, value unsafe.Pointer) (bool, unsafe.Pointer) {
+func (rt *Trie160) Set(ip []byte, mask byte, value unsafe.Pointer) (bool, *Node160) {
 	u32 := iptou(ip, mask)
 	set, olval := rt.addRoute(u32, mask, value, true)
-	return set, olval
+	return set, (*Node160)(olval)
 }

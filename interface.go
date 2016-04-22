@@ -1,25 +1,23 @@
 // Package iptrie implements trie for keeping IP/mask info
 package iptrie
 
-import (
-	"encoding/binary"
-	"io"
-)
+import "io"
 
 // Copyright (c) 2016 Alex Sergeyev. All rights reserved. See LICENSE file for terms of use.
 
 var DEBUG io.Writer
 
+var emptyUint32 = []uint32{0}
+
 func iptou(ip []byte, mask byte) []uint32 {
 	if mask == 0 {
-		return []uint32{0}
+		return emptyUint32
 	}
-	iplen := int(mask >> 3)
+	iplen := int(mask+7) / 8
 	if iplen > len(ip) { // mask / 8
 		panic("Unable to look for key that's shorter than it's mask")
 	}
-
-	u32 := make([]uint32, (mask+31)/32)
+	var u32 [MAXBITS / 32]uint32
 	for pos := 0; pos < iplen; pos += 4 {
 		if diff := iplen - pos; diff > 2 {
 			if diff == 3 {
@@ -39,30 +37,14 @@ func iptou(ip []byte, mask byte) []uint32 {
 	if mask > 0 && mask%32 != 0 {
 		u32[len(u32)-1] = u32[len(u32)-1] &^ (uint32(0xffffffff) >> (mask % 32))
 	}
-	return u32
+	return u32[:(mask+31)/32]
 }
 
 func utoip(words []uint32, mask byte) []byte {
-	ln := ((mask + 31) / 32) * 4 // yes, return 0.0.0.0 and ::0 as empty array
-	ret := make([]byte, ln)
-	for i := byte(0); i < ln; i += 4 {
-		binary.BigEndian.PutUint32(ret[i:], words[i/4])
+	ln := int(mask+31) / 32 // yes, return 0.0.0.0 and ::0 as empty array
+	var ret [MAXBITS / 8]byte
+	for start, i := 0, 0; i < ln; start, i = start+4, i+1 {
+		ret[start], ret[start+1], ret[start+2], ret[start+3] = byte(words[i]>>24), byte(words[i]>>16), byte(words[i]>>8), byte(words[i])
 	}
-	return ret
-}
-
-type Trie32 struct {
-	*tree32
-}
-
-type Trie64 struct {
-	*tree64
-}
-
-type Trie128 struct {
-	*tree128
-}
-
-type Trie160 struct {
-	*tree160
+	return ret[:ln*4]
 }
