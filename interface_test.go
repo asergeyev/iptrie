@@ -24,6 +24,29 @@ func TestTrieInterface(t *testing.T) {
 	}
 }
 
+func TestTrieGetNode(t *testing.T) {
+	var insert = [][5]byte{
+		{1, 0, 0, 0, 8},
+		{1, 2, 0, 0, 16},
+		{1, 2, 0, 0, 24},
+		{1, 2, 1, 0, 24},
+		{1, 2, 2, 0, 24},
+		{1, 2, 3, 0, 24},
+		{1, 2, 4, 0, 24},
+	}
+
+	var T = new(Trie32)
+	for _, tst := range insert {
+		ok, node := T.GetNode(tst[:4], tst[4])
+		if !ok {
+			t.Error("Node was not added", tst[:4], tst[4])
+		}
+		if node == nil {
+			t.Error("Node was not added (nil)", tst[:4], tst[4])
+		}
+	}
+}
+
 func TestTrieBestMatch(t *testing.T) {
 	var insert = [][5]byte{
 		{1, 0, 0, 0, 8},

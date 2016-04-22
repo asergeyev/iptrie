@@ -33,16 +33,12 @@ func keyStr(b []byte, ln byte) string {
 //go:generate go run ./tree_generate.go -o tree_auto.go
 
 type Trie160 struct {
-	*btrienode160
-	nodes []btrienode160
+	node  *Node160
+	nodes []Node160
 }
 
 type Node160 struct {
-	*btrienode160
-}
-
-type btrienode160 struct {
-	a, b      *btrienode160
+	a, b      *Node160
 	data      unsafe.Pointer
 	bits      [MAXBITS / 32]uint32
 	prefixlen byte
@@ -51,7 +47,7 @@ type btrienode160 struct {
 
 // sweep goes thru whole subtree calling f. Could be used for cleanup,
 // e.g.  tree.sweep(0, func(_ int, n *node) { n.a, n.b, n.data = nil, nil, nil })
-func (node *btrienode160) sweep(level int, f func(int, *btrienode160)) {
+func (node *Node160) sweep(level int, f func(int, *Node160)) {
 	if node.a != nil {
 		node.a.sweep(level+1, f)
 	}
@@ -61,7 +57,7 @@ func (node *btrienode160) sweep(level int, f func(int, *btrienode160)) {
 	f(level, node)
 }
 
-func (node *btrienode160) ip() []byte {
+func (node *Node160) ip() []byte {
 	words := (node.prefixlen + 31) / 32
 	if words == 1 {
 		// quickpath
@@ -78,7 +74,7 @@ func (node *btrienode160) ip() []byte {
 }
 
 // match returns true if key/ln is valid child of node or node itself
-func (node *btrienode160) match(key []byte, ln byte) bool {
+func (node *Node160) match(key []byte, ln byte) bool {
 	npl := node.prefixlen
 	if ln < npl {
 		return false
@@ -108,7 +104,7 @@ func (node *btrienode160) match(key []byte, ln byte) bool {
 	return true
 }
 
-func (node *btrienode160) bitsMatched(key []uint32, ln byte) byte {
+func (node *Node160) bitsMatched(key []uint32, ln byte) byte {
 	npl := node.prefixlen
 	if ln < npl {
 		npl = ln // limit matching to min length
@@ -139,9 +135,9 @@ func (node *btrienode160) bitsMatched(key []uint32, ln byte) byte {
 	return plen
 }
 
-func (t *Trie160) newnode(bits []byte, prefixlen, dummy byte) *btrienode160 {
+func (t *Trie160) newnode(bits []byte, prefixlen, dummy byte) *Node160 {
 	if len(t.nodes) == 0 {
-		t.nodes = make([]btrienode160, 20) // 20 nodes at once to prepare
+		t.nodes = make([]Node160, 20) // 20 nodes at once to prepare
 	}
 
 	idx := len(t.nodes) - 1
@@ -156,11 +152,11 @@ func (t *Trie160) newnode(bits []byte, prefixlen, dummy byte) *btrienode160 {
 	return node
 }
 
-func (node *btrienode160) findBestMatch(key []byte, ln byte) (bool, *btrienode160, *btrienode160) {
+func (node *Node160) findBestMatch(key []byte, ln byte) (bool, *Node160, *Node160) {
 	var (
 		exact   bool
-		cparent *btrienode160
-		parent  *btrienode160
+		cparent *Node160
+		parent  *Node160
 	)
 	for node != nil && node.match(key, ln) {
 		if parent != nil && parent.dummy == 0 {
@@ -187,29 +183,29 @@ func (node *btrienode160) findBestMatch(key []byte, ln byte) (bool, *btrienode16
 	return exact, parent, cparent
 }
 
-func (t *Trie160) addToNode(node *btrienode160, key []byte, ln byte, value unsafe.Pointer, replace bool) (set bool, newnode *btrienode160) {
+func (t *Trie160) addToNode(node *Node160, key []byte, ln byte, value unsafe.Pointer, replace bool) (set bool, newnode *Node160) {
 	if ln > MAXBITS {
 		panic("Unable to add prefix longer than MAXBITS")
 	}
 
 	set = true
-	if t.btrienode160 == nil {
+	if t.node == nil {
 		// just starting a tree
 		if DEBUG != nil {
 			fmt.Fprintf(DEBUG, "root=%s (no subtree)\n", keyStr(key, ln))
 		}
-		t.btrienode160 = t.newnode(key[:(ln+7)/8], ln, 0)
-		t.btrienode160.data = value
+		t.node = t.newnode(key[:(ln+7)/8], ln, 0)
+		t.node.data = value
+		newnode = t.node
 		return
 	}
 	var (
 		exact bool
-		down  *btrienode160
+		down  *Node160
 	)
 	if exact, node, _ = node.findBestMatch(key, ln); exact {
 		if node.dummy != 0 {
-			node.dummy = 0
-			node.data = value
+			node.Assign(value)
 			if DEBUG != nil {
 				fmt.Fprintf(DEBUG, "setting empty child's %v/%d value\n", key, ln)
 			}
@@ -251,7 +247,7 @@ func (t *Trie160) addToNode(node *btrienode160, key []byte, ln byte, value unsaf
 		}
 	} else {
 		// newnode goes in front of root node
-		down = t.btrienode160
+		down = t.node
 	}
 
 	parent := node
@@ -297,7 +293,7 @@ func (t *Trie160) addToNode(node *btrienode160, key []byte, ln byte, value unsaf
 				}
 				fmt.Fprintf(DEBUG, "root=%s (uses %s as %s-child)\n", keyStr(key, ln), keyStr(down.ip(), down.prefixlen), m)
 			}
-			t.btrienode160 = newnode
+			t.node = newnode
 		}
 	} else {
 		// down and newnode should have new dummy parent under parent
@@ -341,7 +337,7 @@ func (t *Trie160) addToNode(node *btrienode160, key []byte, ln byte, value unsaf
 				}
 				fmt.Fprintf(DEBUG, "root=%s (uses %s as %s-child)\n", keyStr(node.ip(), node.prefixlen), keyStr(key, ln), m)
 			}
-			t.btrienode160 = node
+			t.node = node
 		}
 	}
 
@@ -349,7 +345,7 @@ func (t *Trie160) addToNode(node *btrienode160, key []byte, ln byte, value unsaf
 }
 
 func (rt *Trie160) Get(ip []byte, mask byte) (bool, []byte, byte, unsafe.Pointer) {
-	exact, node, ct := rt.findBestMatch(ip, mask)
+	exact, node, ct := rt.node.findBestMatch(ip, mask)
 
 	if node != nil && node.dummy == 0 {
 		// dummy=1 means "no match", we will instead look at valid container
@@ -365,11 +361,42 @@ func (rt *Trie160) Get(ip []byte, mask byte) (bool, []byte, byte, unsafe.Pointer
 }
 
 func (rt *Trie160) Append(ip []byte, mask byte, value unsafe.Pointer) (bool, *Node160) {
-	set, olval := rt.addToNode(rt.btrienode160, ip, mask, value, false)
-	return set, &Node160{olval}
+	set, olval := rt.addToNode(rt.node, ip, mask, value, false)
+	return set, olval
 }
 
 func (rt *Trie160) Set(ip []byte, mask byte, value unsafe.Pointer) (bool, *Node160) {
-	set, olval := rt.addToNode(rt.btrienode160, ip, mask, value, true)
-	return set, &Node160{olval}
+	set, olval := rt.addToNode(rt.node, ip, mask, value, true)
+	return set, olval
+}
+
+func (rt *Trie160) GetNode(ip []byte, mask byte) (bool, *Node160) {
+	exact, node, ct := rt.node.findBestMatch(ip, mask)
+	if exact {
+		return false, node // even if it's dummy
+	}
+	if node != nil {
+		_, node = rt.addToNode(node, ip, mask, nil, false)
+	} else {
+		if ct != nil {
+			_, node = rt.addToNode(ct, ip, mask, nil, false)
+		} else {
+			_, node = rt.addToNode(rt.node, ip, mask, nil, false)
+		}
+	}
+	return true, node
+
+}
+
+func (n *Node160) Data() unsafe.Pointer {
+	return n.data
+}
+
+func (n *Node160) IsDummy() bool {
+	return n.dummy != 0
+}
+
+func (n *Node160) Assign(value unsafe.Pointer) {
+	n.data = value
+	n.dummy = 0
 }

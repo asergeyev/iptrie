@@ -35,7 +35,7 @@ var testCases = [][]testCaseElement{
 func TestTransforms(t *testing.T) {
 	for _, testcase := range testCases {
 		for _, s := range testcase {
-			n := new(btrienode160)
+			n := new(Node160)
 			n.prefixlen = s.ln
 			n.bits[0] = mkuint32(s.key, s.ln) // mask already entered correctly in tests above, no need to trim bits
 			if want := binary.BigEndian.Uint32(s.key); n.bits[0] != want {
@@ -58,7 +58,7 @@ func TestTreeAppend(t *testing.T) {
 		buf := bytes.NewBuffer(nil)
 		DEBUG = buf
 		for i, s := range testcase {
-			T.addToNode(T.btrienode160, s.key, s.ln, unsafe.Pointer(&(ptrs[i])), s.repl)
+			T.addToNode(T.node, s.key, s.ln, unsafe.Pointer(&(ptrs[i])), s.repl)
 			got := strings.Replace(buf.String(), "\n", "\\n", -1)
 			if got != s.result {
 				t.Error(got, "!=", s.result)
@@ -71,7 +71,7 @@ func TestTreeAppend(t *testing.T) {
 	// should find exact and not-exact matches
 	for _, testcase := range testCases {
 		for i, s := range testcase {
-			exact, match, _ := T.findBestMatch(s.key, s.ln)
+			exact, match, _ := T.node.findBestMatch(s.key, s.ln)
 			if !exact {
 				t.Errorf("Incorrect match found for exact search, got %v key while looking for %v", match, s)
 			}
@@ -80,7 +80,7 @@ func TestTreeAppend(t *testing.T) {
 			} else if *(*uint64)(match.data) != ptrs[i] {
 				t.Errorf("Incorrect value found for exact search of %v/%d, got %v key while looking for %v", s.key, s.ln, match.data, unsafe.Pointer(uintptr(i+100)))
 			}
-			exact, match, _ = T.findBestMatch(s.key, s.ln+1)
+			exact, match, _ = T.node.findBestMatch(s.key, s.ln+1)
 			if exact || match.prefixlen != s.ln {
 				t.Errorf("Incorrect match found for not-exact search, got %v key while looking for %v", match, s)
 			}
@@ -89,7 +89,7 @@ func TestTreeAppend(t *testing.T) {
 }
 
 func TestNodeMatch(t *testing.T) {
-	b := &btrienode160{
+	b := &Node160{
 		bits:      [5]uint32{0x7f000000}, // 127.0.0.0/16
 		prefixlen: 16,
 	}
