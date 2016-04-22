@@ -9,7 +9,7 @@ import (
 )
 
 func TestTrieInterface(t *testing.T) {
-	var T = New32()
+	var T = new(Trie32)
 	a, _ := T.Append([]byte{1, 2, 3, 4}, 24, nil)
 	if !a {
 		t.Error("Unable to insert!")
@@ -35,7 +35,7 @@ func TestTrieBestMatch(t *testing.T) {
 		{1, 2, 4, 0, 24},
 	}
 
-	var T = New32()
+	var T = new(Trie32)
 	for _, tst := range insert {
 		T.Append(tst[:4], tst[4], nil)
 	}
@@ -119,7 +119,7 @@ func BenchmarkAppend32(b *testing.B) {
 	if b.N > MAXBENCH {
 		b.N = MAXBENCH
 	}
-	var T = New32()
+	var T = new(Trie32)
 	var value = unsafe.Pointer(T) // does not matter where it points to
 	for i := 0; i < b.N; i++ {
 		T.Append(addrs32[i], mask32[i], value)
@@ -130,7 +130,7 @@ func BenchmarkAppend128(b *testing.B) {
 	if b.N > MAXBENCH {
 		b.N = MAXBENCH
 	}
-	var T = New128()
+	var T = new(Trie128)
 	var value = unsafe.Pointer(T) // does not matter where it points to
 	for i := 0; i < b.N; i++ {
 		T.Append(addrs128[i], mask128[i], value)
@@ -141,7 +141,7 @@ func BenchmarkGet32(b *testing.B) {
 	if b.N > MAXBENCH {
 		b.N = MAXBENCH
 	}
-	var T = New32()
+	var T = new(Trie32)
 	for i := 0; i < b.N; i++ {
 		T.Append(addrs32[i], mask32[i], unsafe.Pointer(T))
 	}
@@ -150,7 +150,7 @@ func BenchmarkGet32(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			ex, ip, ln, value := T.Get(addrs32[i], mask32[i])
 			if !ex {
-				b.Error("Not exact get!", i, utoip(iptou(addrs32[i], mask32[i]), mask32[i]), mask32[i], utoip(iptou(ip, ln), ln), ln)
+				b.Error("Not exact get!", i, addrs32[i], mask32[i], ip, ln)
 			} else if value == nil {
 				b.Error("Incorrect get value!")
 			}

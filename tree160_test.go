@@ -35,11 +35,13 @@ var testCases = [][]testCaseElement{
 func TestTransforms(t *testing.T) {
 	for _, testcase := range testCases {
 		for _, s := range testcase {
-			x := iptou(s.key, s.ln) // mask already entered correctly in tests above, no need to trim bits
-			if want := binary.BigEndian.Uint32(s.key); x[0] != want {
-				t.Errorf("Expected %d as uint32 representation of %v/%d, got %d", want, s.key, s.ln, x[0])
+			n := new(btrienode160)
+			n.prefixlen = s.ln
+			n.bits[0] = mkuint32(s.key, s.ln) // mask already entered correctly in tests above, no need to trim bits
+			if want := binary.BigEndian.Uint32(s.key); n.bits[0] != want {
+				t.Errorf("Expected %d as uint32 representation of %v/%d, got %d", want, s.key, s.ln, n.bits[0])
 			}
-			if got := utoip(x, s.ln); !bytes.Equal(s.key, got) {
+			if got := n.ip(); !bytes.Equal(s.key, got) {
 				t.Errorf("Expected %v and got %v converting IP back to bytes (mask=%d)", s.key, got, s.ln)
 			}
 		}
@@ -51,12 +53,12 @@ func TestTreeAppend(t *testing.T) {
 	for i := range ptrs {
 		ptrs[i] = uint64(i + 100)
 	}
-	T := new(tree160)
+	T := new(Trie160)
 	for _, testcase := range testCases {
 		buf := bytes.NewBuffer(nil)
 		DEBUG = buf
 		for i, s := range testcase {
-			T.addRoute(iptou(s.key, s.ln), s.ln, unsafe.Pointer(&(ptrs[i])), s.repl)
+			T.addToNode(T.btrienode160, s.key, s.ln, unsafe.Pointer(&(ptrs[i])), s.repl)
 			got := strings.Replace(buf.String(), "\n", "\\n", -1)
 			if got != s.result {
 				t.Error(got, "!=", s.result)
@@ -69,7 +71,7 @@ func TestTreeAppend(t *testing.T) {
 	// should find exact and not-exact matches
 	for _, testcase := range testCases {
 		for i, s := range testcase {
-			exact, match, _ := T.findBestMatch(iptou(s.key, s.ln), s.ln)
+			exact, match, _ := T.findBestMatch(s.key, s.ln)
 			if !exact {
 				t.Errorf("Incorrect match found for exact search, got %v key while looking for %v", match, s)
 			}
@@ -78,7 +80,7 @@ func TestTreeAppend(t *testing.T) {
 			} else if *(*uint64)(match.data) != ptrs[i] {
 				t.Errorf("Incorrect value found for exact search of %v/%d, got %v key while looking for %v", s.key, s.ln, match.data, unsafe.Pointer(uintptr(i+100)))
 			}
-			exact, match, _ = T.findBestMatch(iptou(s.key, s.ln), s.ln+1)
+			exact, match, _ = T.findBestMatch(s.key, s.ln+1)
 			if exact || match.prefixlen != s.ln {
 				t.Errorf("Incorrect match found for not-exact search, got %v key while looking for %v", match, s)
 			}
@@ -94,17 +96,17 @@ func TestNodeMatch(t *testing.T) {
 	for i := byte(0); i <= 32; i++ {
 		// everyone inside 127.0.0.0/16 formed as 127.0.1.1/xx should match
 		if i < 16 {
-			if b.match([]uint32{0x7f000101}, i) {
+			if b.match([]byte{127, 0, 1, 1}, i) {
 				t.Error("127.0.0.0/16 shoud not match to 127.0.0.1/xx when xx  is", i)
 			}
 		} else {
-			if !b.match([]uint32{0x7f000101}, i) {
+			if !b.match([]byte{127, 0, 1, 1}, i) {
 				t.Error("127.0.0.0/16 does not match to 127.0.1.1/xx when xx  is", i)
 			}
 		}
 	}
 
-	if b.match([]uint32{0x7f010000}, 16) {
+	if b.match([]byte{127, 1, 0, 0}, 16) {
 		t.Error("127.0.0.0/16 shoud not match to 127.1.0.0/16")
 	}
 
