@@ -69,11 +69,9 @@ func (node *Node32) match(key []byte, ln byte) bool {
 	}
 
 	if npl != 0 {
-		var mask uint32
+		mask := uint32(0xffffffff)
 		if npl%32 != 0 {
-			mask = ^(0xffffffff >> (npl % 32))
-		} else {
-			mask = 0xffffffff
+			mask = ^(mask >> (npl % 32))
 		}
 		if npl <= 32 {
 			return node.bits[0]&mask == mkuint32(key, ln)&mask
@@ -138,7 +136,9 @@ func (t *Trie32) newnode(bits []byte, prefixlen, dummy byte) *Node32 {
 	t.nodes = t.nodes[:idx]
 
 	node.prefixlen, node.dummy = prefixlen, dummy
-	for pos := byte(0); pos < (prefixlen+31)/32; pos++ {
+
+	end := (prefixlen + 31) / 32
+	for pos := byte(0); pos < end; pos++ {
 		node.bits[pos] = mkuint32(bits[pos*4:], prefixlen)
 		prefixlen -= 32
 	}
@@ -214,7 +214,7 @@ func (t *Trie32) addToNode(node *Node32, key []byte, ln byte, value unsafe.Point
 		}
 		return set, node
 	}
-	newnode = t.newnode(key[:(ln+7)/8], ln, 0)
+	newnode = t.newnode(key, ln, 0)
 	newnode.data = value
 	if node != nil {
 		if hasBit8(key, node.prefixlen+1) {
@@ -293,6 +293,7 @@ func (t *Trie32) addToNode(node *Node32, key []byte, ln byte, value unsafe.Point
 		node = t.newnode(key[:(ln+7)/8], matched, 1)
 		use_a := hasBit(down.bits[:], matched+1)
 		if use_a == hasBit(newnode.bits[:], matched+1) {
+			fmt.Println(newnode.bits[:], node.bits[:], down.bits[:], matched, key, ln)
 			panic("tangled branches while creating new intermediate parent")
 		}
 		if use_a {
@@ -456,11 +457,9 @@ func (node *Node64) match(key []byte, ln byte) bool {
 	}
 
 	if npl != 0 {
-		var mask uint32
+		mask := uint32(0xffffffff)
 		if npl%32 != 0 {
-			mask = ^(0xffffffff >> (npl % 32))
-		} else {
-			mask = 0xffffffff
+			mask = ^(mask >> (npl % 32))
 		}
 		if npl <= 32 {
 			return node.bits[0]&mask == mkuint32(key, ln)&mask
@@ -525,7 +524,9 @@ func (t *Trie64) newnode(bits []byte, prefixlen, dummy byte) *Node64 {
 	t.nodes = t.nodes[:idx]
 
 	node.prefixlen, node.dummy = prefixlen, dummy
-	for pos := byte(0); pos < (prefixlen+31)/32; pos++ {
+
+	end := (prefixlen + 31) / 32
+	for pos := byte(0); pos < end; pos++ {
 		node.bits[pos] = mkuint32(bits[pos*4:], prefixlen)
 		prefixlen -= 32
 	}
@@ -601,7 +602,7 @@ func (t *Trie64) addToNode(node *Node64, key []byte, ln byte, value unsafe.Point
 		}
 		return set, node
 	}
-	newnode = t.newnode(key[:(ln+7)/8], ln, 0)
+	newnode = t.newnode(key, ln, 0)
 	newnode.data = value
 	if node != nil {
 		if hasBit8(key, node.prefixlen+1) {
@@ -680,6 +681,7 @@ func (t *Trie64) addToNode(node *Node64, key []byte, ln byte, value unsafe.Point
 		node = t.newnode(key[:(ln+7)/8], matched, 1)
 		use_a := hasBit(down.bits[:], matched+1)
 		if use_a == hasBit(newnode.bits[:], matched+1) {
+			fmt.Println(newnode.bits[:], node.bits[:], down.bits[:], matched, key, ln)
 			panic("tangled branches while creating new intermediate parent")
 		}
 		if use_a {
@@ -843,11 +845,9 @@ func (node *Node128) match(key []byte, ln byte) bool {
 	}
 
 	if npl != 0 {
-		var mask uint32
+		mask := uint32(0xffffffff)
 		if npl%32 != 0 {
-			mask = ^(0xffffffff >> (npl % 32))
-		} else {
-			mask = 0xffffffff
+			mask = ^(mask >> (npl % 32))
 		}
 		if npl <= 32 {
 			return node.bits[0]&mask == mkuint32(key, ln)&mask
@@ -912,7 +912,9 @@ func (t *Trie128) newnode(bits []byte, prefixlen, dummy byte) *Node128 {
 	t.nodes = t.nodes[:idx]
 
 	node.prefixlen, node.dummy = prefixlen, dummy
-	for pos := byte(0); pos < (prefixlen+31)/32; pos++ {
+
+	end := (prefixlen + 31) / 32
+	for pos := byte(0); pos < end; pos++ {
 		node.bits[pos] = mkuint32(bits[pos*4:], prefixlen)
 		prefixlen -= 32
 	}
@@ -988,7 +990,7 @@ func (t *Trie128) addToNode(node *Node128, key []byte, ln byte, value unsafe.Poi
 		}
 		return set, node
 	}
-	newnode = t.newnode(key[:(ln+7)/8], ln, 0)
+	newnode = t.newnode(key, ln, 0)
 	newnode.data = value
 	if node != nil {
 		if hasBit8(key, node.prefixlen+1) {
@@ -1067,6 +1069,7 @@ func (t *Trie128) addToNode(node *Node128, key []byte, ln byte, value unsafe.Poi
 		node = t.newnode(key[:(ln+7)/8], matched, 1)
 		use_a := hasBit(down.bits[:], matched+1)
 		if use_a == hasBit(newnode.bits[:], matched+1) {
+			fmt.Println(newnode.bits[:], node.bits[:], down.bits[:], matched, key, ln)
 			panic("tangled branches while creating new intermediate parent")
 		}
 		if use_a {

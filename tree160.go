@@ -161,7 +161,9 @@ func (t *Trie160) newnode(bits []byte, prefixlen, dummy byte) *Node160 {
 	t.nodes = t.nodes[:idx]
 
 	node.prefixlen, node.dummy = prefixlen, dummy
-	for pos := byte(0); pos < (prefixlen+31)/32; pos++ {
+
+	end := (prefixlen + 31) / 32
+	for pos := byte(0); pos < end; pos++ {
 		node.bits[pos] = mkuint32(bits[pos*4:], prefixlen)
 		prefixlen -= 32
 	}
@@ -237,7 +239,7 @@ func (t *Trie160) addToNode(node *Node160, key []byte, ln byte, value unsafe.Poi
 		}
 		return set, node
 	}
-	newnode = t.newnode(key[:(ln+7)/8], ln, 0)
+	newnode = t.newnode(key, ln, 0)
 	newnode.data = value
 	if node != nil {
 		if hasBit8(key, node.prefixlen+1) {
@@ -316,6 +318,7 @@ func (t *Trie160) addToNode(node *Node160, key []byte, ln byte, value unsafe.Poi
 		node = t.newnode(key[:(ln+7)/8], matched, 1)
 		use_a := hasBit(down.bits[:], matched+1)
 		if use_a == hasBit(newnode.bits[:], matched+1) {
+			fmt.Println(newnode.bits[:], node.bits[:], down.bits[:], matched, key, ln)
 			panic("tangled branches while creating new intermediate parent")
 		}
 		if use_a {
