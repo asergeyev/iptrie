@@ -47,17 +47,36 @@ type Node160 struct {
 
 // sweep goes thru whole subtree calling f. Could be used for cleanup,
 // e.g.  tree.sweep(0, func(_ int, n *node) { n.a, n.b, n.data = nil, nil, nil })
-func (node *Node160) sweep(level int, f func(int, *Node160)) {
+func (node *Node160) Sweep(level int, f func(int, *Node160)) {
+	// reverse order
 	if node.a != nil {
-		node.a.sweep(level+1, f)
+		node.a.Sweep(level+1, f)
 	}
 	if node.b != nil {
-		node.b.sweep(level+1, f)
+		node.b.Sweep(level+1, f)
 	}
 	f(level, node)
 }
 
-func (node *Node160) ip() []byte {
+func (node *Node160) Drill(level int, f func(int, *Node160)) {
+	f(level, node)
+	if node.b != nil {
+		node.b.Drill(level+1, f)
+	}
+	if node.a != nil {
+		node.a.Drill(level+1, f)
+	}
+}
+
+func (t *Trie160) Root() *Node160 {
+	return t.node
+}
+
+func (node *Node160) Bits() byte {
+	return node.prefixlen
+}
+
+func (node *Node160) IP() []byte {
 	words := int(node.prefixlen+31) / 32
 	s := make([]byte, 4*words)
 	for i := 0; i < words; i++ {
@@ -75,19 +94,22 @@ func (node *Node160) match(key []byte, ln byte) bool {
 	}
 
 	if npl != 0 {
-		var mask uint32
+		mask := uint32(0xffffffff)
 		if npl%32 != 0 {
-			mask = ^(0xffffffff >> (npl % 32))
-		} else {
-			mask = 0xffffffff
+			mask = ^(mask >> (npl % 32))
 		}
 		if npl <= 32 {
 			return node.bits[0]&mask == mkuint32(key, ln)&mask
 		}
 
 		m := (npl - 1) / 32
-		for s := m - 1; s >= 0; s-- {
-			if node.bits[s] != mkuint32(key[s*4:], ln-s*8) {
+		if m > 0 {
+			for s := m - 1; s > 0; s-- {
+				if node.bits[s] != mkuint32(key[s*4:], ln-s*8) {
+					return false
+				}
+			}
+			if node.bits[0] != mkuint32(key[0:], ln) {
 				return false
 			}
 		}
@@ -158,9 +180,9 @@ func (node *Node160) findBestMatch(key []byte, ln byte) (bool, *Node160, *Node16
 		}
 		if DEBUG != nil {
 			if node.dummy != 0 {
-				fmt.Fprintf(DEBUG, "dummy %s for %s\n", keyStr(node.ip(), node.prefixlen), keyStr(key, ln))
+				fmt.Fprintf(DEBUG, "dummy %s for %s\n", keyStr(node.IP(), node.prefixlen), keyStr(key, ln))
 			} else {
-				fmt.Fprintf(DEBUG, "found %s for %s\n", keyStr(node.ip(), node.prefixlen), keyStr(key, ln))
+				fmt.Fprintf(DEBUG, "found %s for %s\n", keyStr(node.IP(), node.prefixlen), keyStr(key, ln))
 			}
 		}
 		parent = node
@@ -222,7 +244,7 @@ func (t *Trie160) addToNode(node *Node160, key []byte, ln byte, value unsafe.Poi
 			if node.a == nil {
 				node.a = newnode
 				if DEBUG != nil {
-					fmt.Fprintf(DEBUG, "a-child %s for %s\n", keyStr(key, ln), keyStr(node.ip(), node.prefixlen))
+					fmt.Fprintf(DEBUG, "a-child %s for %s\n", keyStr(key, ln), keyStr(node.IP(), node.prefixlen))
 				}
 				return set, newnode
 			}
@@ -232,7 +254,7 @@ func (t *Trie160) addToNode(node *Node160, key []byte, ln byte, value unsafe.Poi
 			if node.b == nil {
 				node.b = newnode
 				if DEBUG != nil {
-					fmt.Fprintf(DEBUG, "b-child %s for %s\n", keyStr(key, ln), keyStr(node.ip(), node.prefixlen))
+					fmt.Fprintf(DEBUG, "b-child %s for %s\n", keyStr(key, ln), keyStr(node.IP(), node.prefixlen))
 				}
 				return set, newnode
 			}
@@ -270,12 +292,12 @@ func (t *Trie160) addToNode(node *Node160, key []byte, ln byte, value unsafe.Poi
 			}
 			if use_a {
 				if DEBUG != nil {
-					fmt.Fprintf(DEBUG, "insert a-child %s to %s before %s\n", keyStr(key, ln), keyStr(parent.ip(), parent.prefixlen), keyStr(down.ip(), down.prefixlen))
+					fmt.Fprintf(DEBUG, "insert a-child %s to %s before %s\n", keyStr(key, ln), keyStr(parent.IP(), parent.prefixlen), keyStr(down.IP(), down.prefixlen))
 				}
 				parent.a = newnode
 			} else {
 				if DEBUG != nil {
-					fmt.Fprintf(DEBUG, "insert b-child %s to %s before %s\n", keyStr(key, ln), keyStr(parent.ip(), parent.prefixlen), keyStr(down.ip(), down.prefixlen))
+					fmt.Fprintf(DEBUG, "insert b-child %s to %s before %s\n", keyStr(key, ln), keyStr(parent.IP(), parent.prefixlen), keyStr(down.IP(), down.prefixlen))
 				}
 				parent.b = newnode
 			}
@@ -285,7 +307,7 @@ func (t *Trie160) addToNode(node *Node160, key []byte, ln byte, value unsafe.Poi
 				if hasBit(newnode.bits[:], 1) {
 					m = "a"
 				}
-				fmt.Fprintf(DEBUG, "root=%s (uses %s as %s-child)\n", keyStr(key, ln), keyStr(down.ip(), down.prefixlen), m)
+				fmt.Fprintf(DEBUG, "root=%s (uses %s as %s-child)\n", keyStr(key, ln), keyStr(down.IP(), down.prefixlen), m)
 			}
 			t.node = newnode
 		}
@@ -300,13 +322,13 @@ func (t *Trie160) addToNode(node *Node160, key []byte, ln byte, value unsafe.Poi
 			node.a = down
 			node.b = newnode
 			if DEBUG != nil {
-				fmt.Fprintf(DEBUG, "created a-dummy %s with %s and %s\n", keyStr(node.ip(), node.prefixlen), keyStr(down.ip(), down.prefixlen), keyStr(key, ln))
+				fmt.Fprintf(DEBUG, "created a-dummy %s with %s and %s\n", keyStr(node.IP(), node.prefixlen), keyStr(down.IP(), down.prefixlen), keyStr(key, ln))
 			}
 		} else {
 			node.b = down
 			node.a = newnode
 			if DEBUG != nil {
-				fmt.Fprintf(DEBUG, "created b-dummy %s with %s and %s\n", keyStr(node.ip(), node.prefixlen), keyStr(key, ln), keyStr(down.ip(), down.prefixlen))
+				fmt.Fprintf(DEBUG, "created b-dummy %s with %s and %s\n", keyStr(node.IP(), node.prefixlen), keyStr(key, ln), keyStr(down.IP(), down.prefixlen))
 			}
 		}
 
@@ -315,12 +337,12 @@ func (t *Trie160) addToNode(node *Node160, key []byte, ln byte, value unsafe.Poi
 			if hasBit(node.bits[:], parent.prefixlen+1) {
 				parent.a = node
 				if DEBUG != nil {
-					fmt.Fprintf(DEBUG, "insert a-child %s to %s before %s\n", keyStr(node.ip(), node.prefixlen), keyStr(parent.ip(), parent.prefixlen), keyStr(node.a.ip(), node.a.prefixlen))
+					fmt.Fprintf(DEBUG, "insert a-child %s to %s before %s\n", keyStr(node.IP(), node.prefixlen), keyStr(parent.IP(), parent.prefixlen), keyStr(node.a.IP(), node.a.prefixlen))
 				}
 			} else {
 				parent.b = node
 				if DEBUG != nil {
-					fmt.Fprintf(DEBUG, "insert b-child %s to %s before %s\n", keyStr(node.ip(), node.prefixlen), keyStr(parent.ip(), parent.prefixlen), keyStr(node.b.ip(), node.b.prefixlen))
+					fmt.Fprintf(DEBUG, "insert b-child %s to %s before %s\n", keyStr(node.IP(), node.prefixlen), keyStr(parent.IP(), parent.prefixlen), keyStr(node.b.IP(), node.b.prefixlen))
 				}
 			}
 		} else {
@@ -329,7 +351,7 @@ func (t *Trie160) addToNode(node *Node160, key []byte, ln byte, value unsafe.Poi
 				if use_a {
 					m = "a"
 				}
-				fmt.Fprintf(DEBUG, "root=%s (uses %s as %s-child)\n", keyStr(node.ip(), node.prefixlen), keyStr(key, ln), m)
+				fmt.Fprintf(DEBUG, "root=%s (uses %s as %s-child)\n", keyStr(node.IP(), node.prefixlen), keyStr(key, ln), m)
 			}
 			t.node = node
 		}
@@ -343,12 +365,12 @@ func (rt *Trie160) Get(ip []byte, mask byte) (bool, []byte, byte, unsafe.Pointer
 
 	if node != nil && node.dummy == 0 {
 		// dummy=1 means "no match", we will instead look at valid container
-		return exact, node.ip(), node.prefixlen, node.data
+		return exact, node.IP(), node.prefixlen, node.data
 	}
 
 	if ct != nil {
 		// accept container as the answer if it's present
-		return false, ct.ip(), ct.prefixlen, ct.data
+		return false, ct.IP(), ct.prefixlen, ct.data
 	}
 	return false, nil, 0, nil
 

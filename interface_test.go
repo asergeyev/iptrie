@@ -3,6 +3,8 @@ package iptrie
 import (
 	"bytes"
 	"math/rand"
+	"os"
+	"strings"
 	"testing"
 	"time"
 	"unsafe"
@@ -43,6 +45,24 @@ func TestTrieGetNode(t *testing.T) {
 		}
 		if node == nil {
 			t.Error("Node was not added (nil)", tst[:4], tst[4])
+		}
+	}
+}
+
+func TestTrieGetNodeV6(t *testing.T) {
+	var insert = [][]byte{
+		{1, 0, 0, 0, 32},
+		{1, 2, 0, 0, 3, 7, 48},
+	}
+
+	var T = new(Trie128)
+	for _, tst := range insert {
+		ok, node := T.GetNode(tst[:len(tst)-1], tst[len(tst)-1])
+		if !ok {
+			t.Error("Node was not added", tst[:len(tst)-1], tst[len(tst)-1])
+		}
+		if node == nil {
+			t.Error("Node was not added (nil)", tst[:len(tst)-1], tst[len(tst)-1])
 		}
 	}
 }
@@ -119,22 +139,24 @@ var addrs128 = make([][]byte, MAXBENCH)
 var mask128 = make([]byte, MAXBENCH)
 
 func init() {
-	rand.Seed(int64(time.Now().Nanosecond()))
-	for _ = range mask32 {
-		u32 := rand.Uint32()
-		mask32 = append(mask32, byte((rand.Uint32()%24)+8)) // 8 to 32
-		//addrs32 = append(addrs32, utoip(iptou([]byte{byte(u32 >> 24), byte(u32 >> 16), byte(u32 >> 8), byte(u32)}, mask32[i]), mask32[i]))
-		addrs32 = append(addrs32, []byte{byte(u32 >> 24), byte(u32 >> 16), byte(u32 >> 8), byte(u32)})
-	}
-	for _ = range mask128 {
-		u32 := rand.Uint32()
-		mask128 = append(mask128, byte((rand.Uint32()%32)+32)) // 32 to 64
-		addrs128 = append(addrs128, []byte{
-			0x20, byte(u32), byte(u32 >> 24), 0,
-			byte(u32 >> 16), 0, byte(u32 >> 8), 0,
-			byte(u32), byte(u32 >> 24), byte(u32 >> 16), byte(u32 >> 8),
-			byte(u32), byte(u32 >> 8), byte(u32), 1,
-		})
+	if strings.Contains(strings.Join(os.Args, " "), "-bench") {
+		rand.Seed(int64(time.Now().Nanosecond()))
+		for _ = range mask32 {
+			u32 := rand.Uint32()
+			mask32 = append(mask32, byte((rand.Uint32()%24)+8)) // 8 to 32
+			//addrs32 = append(addrs32, utoip(iptou([]byte{byte(u32 >> 24), byte(u32 >> 16), byte(u32 >> 8), byte(u32)}, mask32[i]), mask32[i]))
+			addrs32 = append(addrs32, []byte{byte(u32 >> 24), byte(u32 >> 16), byte(u32 >> 8), byte(u32)})
+		}
+		for _ = range mask128 {
+			u32 := rand.Uint32()
+			mask128 = append(mask128, byte((rand.Uint32()%32)+32)) // 32 to 64
+			addrs128 = append(addrs128, []byte{
+				0x20, byte(u32), byte(u32 >> 24), 0,
+				byte(u32 >> 16), 0, byte(u32 >> 8), 0,
+				byte(u32), byte(u32 >> 24), byte(u32 >> 16), byte(u32 >> 8),
+				byte(u32), byte(u32 >> 8), byte(u32), 1,
+			})
+		}
 	}
 }
 
@@ -146,6 +168,17 @@ func BenchmarkAppend32(b *testing.B) {
 	var value = unsafe.Pointer(T) // does not matter where it points to
 	for i := 0; i < b.N; i++ {
 		T.Append(addrs32[i], mask32[i], value)
+	}
+	if testing.Verbose() && b.N == MAXBENCH {
+		b.StopTimer()
+		ts := time.Now()
+		T.Root().Drill(0, func(l int, n *Node32) {
+			if n == nil {
+				panic("notok")
+			}
+			return
+		})
+		b.Log("Time to drill", b.N, "is", time.Since(ts))
 	}
 }
 
@@ -181,6 +214,32 @@ func BenchmarkGet32(b *testing.B) {
 	} else {
 		for i := 0; i < b.N; i++ {
 			T.Get(addrs32[i], mask32[i])
+		}
+	}
+	return
+}
+
+func BenchmarkGet128(b *testing.B) {
+	if b.N > MAXBENCH {
+		b.N = MAXBENCH
+	}
+	var T = new(Trie128)
+	for i := 0; i < b.N; i++ {
+		T.Append(addrs128[i], mask128[i], unsafe.Pointer(T))
+	}
+	if testing.Verbose() {
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			ex, ip, ln, value := T.Get(addrs128[i], mask128[i])
+			if !ex {
+				b.Error("Not exact get!", i, addrs128[i], mask128[i], ip, ln)
+			} else if value == nil {
+				b.Error("Incorrect get value!")
+			}
+		}
+	} else {
+		for i := 0; i < b.N; i++ {
+			T.Get(addrs128[i], mask128[i])
 		}
 	}
 	return

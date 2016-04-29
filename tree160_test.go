@@ -23,12 +23,12 @@ var testCases = [][]testCaseElement{
 		{[]byte{1, 2, 3, 0}, 29, true, "found 1.2.3.0/24 for 1.2.3.0/29\\nb-child 1.2.3.0/29 for 1.2.3.0/24\\n"},
 		{[]byte{1, 2, 0, 0}, 16, true, "root=1.2.0.0/16 (uses 1.2.3.0/24 as b-child)\\n"},
 		{[]byte{1, 2, 3, 0}, 26, true, "found 1.2.0.0/16 for 1.2.3.0/26\\nfound 1.2.3.0/24 for 1.2.3.0/26\\ninsert b-child 1.2.3.0/26 to 1.2.3.0/24 before 1.2.3.0/29\\n"},
-		{[]byte{1, 2, 4, 0}, 26, true, "found 1.2.0.0/16 for 1.2.4.0/26\\ncreated b-dummy 1.2.4.0/21 with 1.2.4.0/26 and 1.2.3.0/24\\ninsert b-child 1.2.4.0/21 to 1.2.0.0/16 before 1.2.3.0/24\\n"},
-		{[]byte{1, 3, 0, 0}, 16, true, "created b-dummy 1.3.0.0/15 with 1.3.0.0/16 and 1.2.0.0/16\\nroot=1.3.0.0/15 (uses 1.3.0.0/16 as b-child)\\n"},
-		{[]byte{1, 3, 0, 0}, 22, true, "dummy 1.3.0.0/15 for 1.3.0.0/22\\nfound 1.3.0.0/16 for 1.3.0.0/22\\nb-child 1.3.0.0/22 for 1.3.0.0/16\\n"},
-		{[]byte{1, 3, 2, 0}, 24, true, "dummy 1.3.0.0/15 for 1.3.2.0/24\\nfound 1.3.0.0/16 for 1.3.2.0/24\\nfound 1.3.0.0/22 for 1.3.2.0/24\\na-child 1.3.2.0/24 for 1.3.0.0/22\\n"},
-		{[]byte{1, 3, 4, 0}, 23, true, "dummy 1.3.0.0/15 for 1.3.4.0/23\\nfound 1.3.0.0/16 for 1.3.4.0/23\\ncreated b-dummy 1.3.4.0/21 with 1.3.4.0/23 and 1.3.0.0/22\\ninsert b-child 1.3.4.0/21 to 1.3.0.0/16 before 1.3.0.0/22\\n"},
-		{[]byte{1, 3, 4, 128}, 25, true, "dummy 1.3.0.0/15 for 1.3.4.128/25\\nfound 1.3.0.0/16 for 1.3.4.128/25\\ndummy 1.3.4.0/21 for 1.3.4.128/25\\nfound 1.3.4.0/23 for 1.3.4.128/25\\nb-child 1.3.4.128/25 for 1.3.4.0/23\\n"},
+		{[]byte{1, 2, 4, 0}, 26, true, "found 1.2.0.0/16 for 1.2.4.0/26\\ncreated b-dummy 1.2.0.0/21 with 1.2.4.0/26 and 1.2.3.0/24\\ninsert b-child 1.2.0.0/21 to 1.2.0.0/16 before 1.2.3.0/24\\n"},
+		{[]byte{1, 3, 0, 0}, 16, true, "created b-dummy 1.2.0.0/15 with 1.3.0.0/16 and 1.2.0.0/16\\nroot=1.2.0.0/15 (uses 1.3.0.0/16 as b-child)\\n"},
+		{[]byte{1, 3, 0, 0}, 22, true, "dummy 1.2.0.0/15 for 1.3.0.0/22\\nfound 1.3.0.0/16 for 1.3.0.0/22\\nb-child 1.3.0.0/22 for 1.3.0.0/16\\n"},
+		{[]byte{1, 3, 2, 0}, 24, true, "dummy 1.2.0.0/15 for 1.3.2.0/24\\nfound 1.3.0.0/16 for 1.3.2.0/24\\nfound 1.3.0.0/22 for 1.3.2.0/24\\na-child 1.3.2.0/24 for 1.3.0.0/22\\n"},
+		{[]byte{1, 3, 4, 0}, 23, true, "dummy 1.2.0.0/15 for 1.3.4.0/23\\nfound 1.3.0.0/16 for 1.3.4.0/23\\ncreated b-dummy 1.3.0.0/21 with 1.3.4.0/23 and 1.3.0.0/22\\ninsert b-child 1.3.0.0/21 to 1.3.0.0/16 before 1.3.0.0/22\\n"},
+		{[]byte{1, 3, 4, 128}, 25, true, "dummy 1.2.0.0/15 for 1.3.4.128/25\\nfound 1.3.0.0/16 for 1.3.4.128/25\\ndummy 1.3.0.0/21 for 1.3.4.128/25\\nfound 1.3.4.0/23 for 1.3.4.128/25\\nb-child 1.3.4.128/25 for 1.3.4.0/23\\n"},
 	},
 }
 
@@ -41,7 +41,7 @@ func TestTransforms(t *testing.T) {
 			if want := binary.BigEndian.Uint32(s.key); n.bits[0] != want {
 				t.Errorf("Expected %d as uint32 representation of %v/%d, got %d", want, s.key, s.ln, n.bits[0])
 			}
-			if got := n.ip(); !bytes.Equal(s.key, got) {
+			if got := n.IP(); !bytes.Equal(s.key, got) {
 				t.Errorf("Expected %v and got %v converting IP back to bytes (mask=%d)", s.key, got, s.ln)
 			}
 		}
@@ -108,6 +108,23 @@ func TestNodeMatch(t *testing.T) {
 
 	if b.match([]byte{127, 1, 0, 0}, 16) {
 		t.Error("127.0.0.0/16 shoud not match to 127.1.0.0/16")
+	}
+
+}
+
+func TestNodeMatchLong(t *testing.T) {
+	b := &Node160{
+		bits:      [5]uint32{0x7f000000}, // 7f00::
+		prefixlen: 48,
+	}
+	for i := byte(0); i <= 48; i++ {
+		if b.match([]byte{127, 0, 1, 1, 0}, i) {
+			t.Error("7f00:/48 shoud not match to 7f11/xx when xx is", i)
+		}
+	}
+
+	if !b.match([]byte{127, 0, 0, 0, 0, 0}, 48) {
+		t.Error("7f00:/48 should match 7f00:/48")
 	}
 
 }
