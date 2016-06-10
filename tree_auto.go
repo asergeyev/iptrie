@@ -412,6 +412,10 @@ func (rt *Trie32) Append(ip []byte, mask byte, value unsafe.Pointer) (bool, *Nod
 	return set, olval
 }
 
+func (rt *Trie32) Remove(ip []byte, mask byte) bool {
+	return rt.node.delChildNode(ip, mask)
+}
+
 func (rt *Trie32) Set(ip []byte, mask byte, value unsafe.Pointer) (bool, *Node32) {
 	set, olval := rt.addToNode(rt.node, ip, mask, value, true)
 	return set, olval
@@ -853,6 +857,10 @@ func (rt *Trie64) Append(ip []byte, mask byte, value unsafe.Pointer) (bool, *Nod
 	return set, olval
 }
 
+func (rt *Trie64) Remove(ip []byte, mask byte) bool {
+	return rt.node.delChildNode(ip, mask)
+}
+
 func (rt *Trie64) Set(ip []byte, mask byte, value unsafe.Pointer) (bool, *Node64) {
 	set, olval := rt.addToNode(rt.node, ip, mask, value, true)
 	return set, olval
@@ -1292,6 +1300,10 @@ func (rt *Trie128) Get(ip []byte, mask byte) (bool, []byte, byte, unsafe.Pointer
 func (rt *Trie128) Append(ip []byte, mask byte, value unsafe.Pointer) (bool, *Node128) {
 	set, olval := rt.addToNode(rt.node, ip, mask, value, false)
 	return set, olval
+}
+
+func (rt *Trie128) Remove(ip []byte, mask byte) bool {
+	return rt.node.delChildNode(ip, mask)
 }
 
 func (rt *Trie128) Set(ip []byte, mask byte, value unsafe.Pointer) (bool, *Node128) {

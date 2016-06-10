@@ -437,6 +437,10 @@ func (rt *Trie160) Append(ip []byte, mask byte, value unsafe.Pointer) (bool, *No
 	return set, olval
 }
 
+func (rt *Trie160) Remove(ip []byte, mask byte) bool {
+	return rt.node.delChildNode(ip, mask)
+}
+
 func (rt *Trie160) Set(ip []byte, mask byte, value unsafe.Pointer) (bool, *Node160) {
 	set, olval := rt.addToNode(rt.node, ip, mask, value, true)
 	return set, olval
