@@ -172,13 +172,21 @@ func BenchmarkAppend32(b *testing.B) {
 	if testing.Verbose() && b.N == MAXBENCH {
 		b.StopTimer()
 		ts := time.Now()
-		T.Root().Drill(0, func(l int, n *Node32) {
+		T.Root().Drill(func(n *Node32) {
 			if n == nil {
 				panic("notok")
 			}
 			return
 		})
 		b.Log("Time to drill", b.N, "is", time.Since(ts))
+		ts = time.Now()
+		T.Root().DrillN(func(n *Node32) {
+			if n == nil {
+				panic("notok")
+			}
+			return
+		})
+		b.Log("Time to drill non-recursively", b.N, "is", time.Since(ts))
 	}
 }
 

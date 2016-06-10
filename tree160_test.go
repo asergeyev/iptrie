@@ -128,3 +128,27 @@ func TestNodeMatchLong(t *testing.T) {
 	}
 
 }
+
+func TestTreeDelete(t *testing.T) {
+	T := new(Trie160)
+	for _, testcase := range testCases {
+		for _, s := range testcase {
+			T.addToNode(T.node, s.key, s.ln, nil, s.repl)
+		}
+	}
+	// del all /16
+	if T.Root().delChildNode([]byte{1, 1, 0, 0}, 16) {
+		t.Error("Not existing node should not be deleted (1.1.0.0/16)")
+	}
+	if !T.Root().delChildNode([]byte{1, 2, 0, 0}, 16) {
+		t.Error("Existing node could not be deleted (1.2.0.0/16)")
+	}
+	if !T.Root().delChildNode([]byte{1, 3, 0, 0}, 16) {
+		t.Error("Existing node could not be deleted (1.3.0.0/16)")
+	}
+	T.Root().Drill(func(n *Node160) {
+		if !n.IsDummy() && n.Bits() == 16 {
+			t.Error("There should not be a node with /16 in tree after deletion")
+		}
+	})
+}

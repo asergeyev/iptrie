@@ -13,33 +13,51 @@ type Trie32 struct {
 }
 
 type Node32 struct {
-	a, b      *Node32
-	data      unsafe.Pointer
-	bits      [32 / 32]uint32
 	prefixlen byte
+	a, b      *Node32
+	bits      [32 / 32]uint32
+	data      unsafe.Pointer
 	dummy     byte
 }
 
 // sweep goes thru whole subtree calling f. Could be used for cleanup,
 // e.g.  tree.sweep(0, func(_ int, n *node) { n.a, n.b, n.data = nil, nil, nil })
-func (node *Node32) Sweep(level int, f func(int, *Node32)) {
+func (node *Node32) Sweep(f func(*Node32)) {
 	// reverse order
 	if node.a != nil {
-		node.a.Sweep(level+1, f)
+		node.a.Sweep(f)
 	}
 	if node.b != nil {
-		node.b.Sweep(level+1, f)
+		node.b.Sweep(f)
 	}
-	f(level, node)
+	f(node)
 }
 
-func (node *Node32) Drill(level int, f func(int, *Node32)) {
-	f(level, node)
+func (node *Node32) Drill(f func(*Node32)) {
+	f(node)
 	if node.b != nil {
-		node.b.Drill(level+1, f)
+		node.b.Drill(f)
 	}
 	if node.a != nil {
-		node.a.Drill(level+1, f)
+		node.a.Drill(f)
+	}
+}
+
+func (node *Node32) DrillN(f func(*Node32)) {
+	stack := []*Node32{node}
+	for len(stack) > 0 {
+		xn := len(stack) - 1
+		f(stack[xn])
+		if node.b != nil {
+			stack[xn] = node.b
+			if node.a != nil {
+				stack = append(stack, node.a)
+			}
+		} else if node.a != nil {
+			stack[xn] = node.a
+		} else {
+			stack = stack[:xn]
+		}
 	}
 }
 
@@ -63,12 +81,11 @@ func (node *Node32) IP() []byte {
 
 // match returns true if key/ln is valid child of node or node itself
 func (node *Node32) match(key []byte, ln byte) bool {
-	npl := node.prefixlen
-	if ln < npl {
+	if ln < node.prefixlen {
 		return false
 	}
 
-	if npl != 0 {
+	if npl := node.prefixlen; npl != 0 {
 		mask := uint32(0xffffffff)
 		if npl%32 != 0 {
 			mask = ^(mask >> (npl % 32))
@@ -174,6 +191,43 @@ func (node *Node32) findBestMatch(key []byte, ln byte) (bool, *Node32, *Node32) 
 		}
 	}
 	return exact, parent, cparent
+}
+
+func (node *Node32) delChildNode(key []byte, ln byte) bool {
+	var parent *Node32
+	for node != nil && node.match(key, ln) {
+		parent = node
+		if hasBit8(key, parent.prefixlen+1) {
+			node = node.a
+			if node.prefixlen == ln {
+				if node.a == nil && node.b == nil {
+					parent.a = nil
+				} else if node.b == nil {
+					// right branch has right side child, trim
+					parent.a = node.a
+				} else {
+					node.data = nil
+					node.dummy = 1
+				}
+				return true
+			}
+		} else {
+			node = node.b
+			if node.prefixlen == ln {
+				if node.a == nil && node.b == nil {
+					parent.b = nil
+				} else if node.a == nil {
+					// left branch has left side child, trim
+					parent.b = node.b
+				} else {
+					node.data = nil
+					node.dummy = 1
+				}
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (t *Trie32) addToNode(node *Node32, key []byte, ln byte, value unsafe.Pointer, replace bool) (set bool, newnode *Node32) {
@@ -293,7 +347,6 @@ func (t *Trie32) addToNode(node *Node32, key []byte, ln byte, value unsafe.Point
 		node = t.newnode(key[:(ln+7)/8], matched, 1)
 		use_a := hasBit(down.bits[:], matched+1)
 		if use_a == hasBit(newnode.bits[:], matched+1) {
-			fmt.Println(newnode.bits[:], node.bits[:], down.bits[:], matched, key, ln)
 			panic("tangled branches while creating new intermediate parent")
 		}
 		if use_a {
@@ -401,33 +454,51 @@ type Trie64 struct {
 }
 
 type Node64 struct {
-	a, b      *Node64
-	data      unsafe.Pointer
-	bits      [64 / 32]uint32
 	prefixlen byte
+	a, b      *Node64
+	bits      [64 / 32]uint32
+	data      unsafe.Pointer
 	dummy     byte
 }
 
 // sweep goes thru whole subtree calling f. Could be used for cleanup,
 // e.g.  tree.sweep(0, func(_ int, n *node) { n.a, n.b, n.data = nil, nil, nil })
-func (node *Node64) Sweep(level int, f func(int, *Node64)) {
+func (node *Node64) Sweep(f func(*Node64)) {
 	// reverse order
 	if node.a != nil {
-		node.a.Sweep(level+1, f)
+		node.a.Sweep(f)
 	}
 	if node.b != nil {
-		node.b.Sweep(level+1, f)
+		node.b.Sweep(f)
 	}
-	f(level, node)
+	f(node)
 }
 
-func (node *Node64) Drill(level int, f func(int, *Node64)) {
-	f(level, node)
+func (node *Node64) Drill(f func(*Node64)) {
+	f(node)
 	if node.b != nil {
-		node.b.Drill(level+1, f)
+		node.b.Drill(f)
 	}
 	if node.a != nil {
-		node.a.Drill(level+1, f)
+		node.a.Drill(f)
+	}
+}
+
+func (node *Node64) DrillN(f func(*Node64)) {
+	stack := []*Node64{node}
+	for len(stack) > 0 {
+		xn := len(stack) - 1
+		f(stack[xn])
+		if node.b != nil {
+			stack[xn] = node.b
+			if node.a != nil {
+				stack = append(stack, node.a)
+			}
+		} else if node.a != nil {
+			stack[xn] = node.a
+		} else {
+			stack = stack[:xn]
+		}
 	}
 }
 
@@ -451,12 +522,11 @@ func (node *Node64) IP() []byte {
 
 // match returns true if key/ln is valid child of node or node itself
 func (node *Node64) match(key []byte, ln byte) bool {
-	npl := node.prefixlen
-	if ln < npl {
+	if ln < node.prefixlen {
 		return false
 	}
 
-	if npl != 0 {
+	if npl := node.prefixlen; npl != 0 {
 		mask := uint32(0xffffffff)
 		if npl%32 != 0 {
 			mask = ^(mask >> (npl % 32))
@@ -562,6 +632,43 @@ func (node *Node64) findBestMatch(key []byte, ln byte) (bool, *Node64, *Node64) 
 		}
 	}
 	return exact, parent, cparent
+}
+
+func (node *Node64) delChildNode(key []byte, ln byte) bool {
+	var parent *Node64
+	for node != nil && node.match(key, ln) {
+		parent = node
+		if hasBit8(key, parent.prefixlen+1) {
+			node = node.a
+			if node.prefixlen == ln {
+				if node.a == nil && node.b == nil {
+					parent.a = nil
+				} else if node.b == nil {
+					// right branch has right side child, trim
+					parent.a = node.a
+				} else {
+					node.data = nil
+					node.dummy = 1
+				}
+				return true
+			}
+		} else {
+			node = node.b
+			if node.prefixlen == ln {
+				if node.a == nil && node.b == nil {
+					parent.b = nil
+				} else if node.a == nil {
+					// left branch has left side child, trim
+					parent.b = node.b
+				} else {
+					node.data = nil
+					node.dummy = 1
+				}
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (t *Trie64) addToNode(node *Node64, key []byte, ln byte, value unsafe.Pointer, replace bool) (set bool, newnode *Node64) {
@@ -681,7 +788,6 @@ func (t *Trie64) addToNode(node *Node64, key []byte, ln byte, value unsafe.Point
 		node = t.newnode(key[:(ln+7)/8], matched, 1)
 		use_a := hasBit(down.bits[:], matched+1)
 		if use_a == hasBit(newnode.bits[:], matched+1) {
-			fmt.Println(newnode.bits[:], node.bits[:], down.bits[:], matched, key, ln)
 			panic("tangled branches while creating new intermediate parent")
 		}
 		if use_a {
@@ -789,33 +895,51 @@ type Trie128 struct {
 }
 
 type Node128 struct {
-	a, b      *Node128
-	data      unsafe.Pointer
-	bits      [128 / 32]uint32
 	prefixlen byte
+	a, b      *Node128
+	bits      [128 / 32]uint32
+	data      unsafe.Pointer
 	dummy     byte
 }
 
 // sweep goes thru whole subtree calling f. Could be used for cleanup,
 // e.g.  tree.sweep(0, func(_ int, n *node) { n.a, n.b, n.data = nil, nil, nil })
-func (node *Node128) Sweep(level int, f func(int, *Node128)) {
+func (node *Node128) Sweep(f func(*Node128)) {
 	// reverse order
 	if node.a != nil {
-		node.a.Sweep(level+1, f)
+		node.a.Sweep(f)
 	}
 	if node.b != nil {
-		node.b.Sweep(level+1, f)
+		node.b.Sweep(f)
 	}
-	f(level, node)
+	f(node)
 }
 
-func (node *Node128) Drill(level int, f func(int, *Node128)) {
-	f(level, node)
+func (node *Node128) Drill(f func(*Node128)) {
+	f(node)
 	if node.b != nil {
-		node.b.Drill(level+1, f)
+		node.b.Drill(f)
 	}
 	if node.a != nil {
-		node.a.Drill(level+1, f)
+		node.a.Drill(f)
+	}
+}
+
+func (node *Node128) DrillN(f func(*Node128)) {
+	stack := []*Node128{node}
+	for len(stack) > 0 {
+		xn := len(stack) - 1
+		f(stack[xn])
+		if node.b != nil {
+			stack[xn] = node.b
+			if node.a != nil {
+				stack = append(stack, node.a)
+			}
+		} else if node.a != nil {
+			stack[xn] = node.a
+		} else {
+			stack = stack[:xn]
+		}
 	}
 }
 
@@ -839,12 +963,11 @@ func (node *Node128) IP() []byte {
 
 // match returns true if key/ln is valid child of node or node itself
 func (node *Node128) match(key []byte, ln byte) bool {
-	npl := node.prefixlen
-	if ln < npl {
+	if ln < node.prefixlen {
 		return false
 	}
 
-	if npl != 0 {
+	if npl := node.prefixlen; npl != 0 {
 		mask := uint32(0xffffffff)
 		if npl%32 != 0 {
 			mask = ^(mask >> (npl % 32))
@@ -950,6 +1073,43 @@ func (node *Node128) findBestMatch(key []byte, ln byte) (bool, *Node128, *Node12
 		}
 	}
 	return exact, parent, cparent
+}
+
+func (node *Node128) delChildNode(key []byte, ln byte) bool {
+	var parent *Node128
+	for node != nil && node.match(key, ln) {
+		parent = node
+		if hasBit8(key, parent.prefixlen+1) {
+			node = node.a
+			if node.prefixlen == ln {
+				if node.a == nil && node.b == nil {
+					parent.a = nil
+				} else if node.b == nil {
+					// right branch has right side child, trim
+					parent.a = node.a
+				} else {
+					node.data = nil
+					node.dummy = 1
+				}
+				return true
+			}
+		} else {
+			node = node.b
+			if node.prefixlen == ln {
+				if node.a == nil && node.b == nil {
+					parent.b = nil
+				} else if node.a == nil {
+					// left branch has left side child, trim
+					parent.b = node.b
+				} else {
+					node.data = nil
+					node.dummy = 1
+				}
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (t *Trie128) addToNode(node *Node128, key []byte, ln byte, value unsafe.Pointer, replace bool) (set bool, newnode *Node128) {
@@ -1069,7 +1229,6 @@ func (t *Trie128) addToNode(node *Node128, key []byte, ln byte, value unsafe.Poi
 		node = t.newnode(key[:(ln+7)/8], matched, 1)
 		use_a := hasBit(down.bits[:], matched+1)
 		if use_a == hasBit(newnode.bits[:], matched+1) {
-			fmt.Println(newnode.bits[:], node.bits[:], down.bits[:], matched, key, ln)
 			panic("tangled branches while creating new intermediate parent")
 		}
 		if use_a {
