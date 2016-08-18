@@ -452,6 +452,11 @@ func (n *Node32) Assign(value unsafe.Pointer) {
 	n.dummy = 0
 }
 
+func (n *Node32) Strip() {
+	n.data = nil
+	n.dummy = 1
+}
+
 type Trie64 struct {
 	node  *Node64
 	nodes []Node64
@@ -897,6 +902,11 @@ func (n *Node64) Assign(value unsafe.Pointer) {
 	n.dummy = 0
 }
 
+func (n *Node64) Strip() {
+	n.data = nil
+	n.dummy = 1
+}
+
 type Trie128 struct {
 	node  *Node128
 	nodes []Node128
@@ -1340,4 +1350,9 @@ func (n *Node128) IsDummy() bool {
 func (n *Node128) Assign(value unsafe.Pointer) {
 	n.data = value
 	n.dummy = 0
+}
+
+func (n *Node128) Strip() {
+	n.data = nil
+	n.dummy = 1
 }

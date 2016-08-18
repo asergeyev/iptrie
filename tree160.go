@@ -476,3 +476,8 @@ func (n *Node160) Assign(value unsafe.Pointer) {
 	n.data = value
 	n.dummy = 0
 }
+
+func (n *Node160) Strip() {
+	n.data = nil
+	n.dummy = 1
+}
